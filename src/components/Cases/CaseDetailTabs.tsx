@@ -87,8 +87,9 @@ export function CaseDetailTabs({
   timeEntries = [],
   timeTotals = { totalHours: 0, totalBillableAmount: 0, totalUnbilledAmount: 0, unbilledHours: 0 },
   invoicesList = [],
+  signatureRequestsList = [],
   currentUserId,
-}: CaseDetailTabsProps & { invoicesList?: any[] }) {
+}: CaseDetailTabsProps & { invoicesList?: any[]; signatureRequestsList?: any[] }) {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [timerDuration, setTimerDuration] = useState<number | null>(null)
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -338,7 +339,13 @@ export function CaseDetailTabs({
         aria-labelledby="tab-documents"
         hidden={activeTab !== 'documents'}
       >
-        <DocumentHub caseId={caseData.id} documents={documents} role={role} />
+        <DocumentHub
+          caseId={caseData.id}
+          documents={documents}
+          role={role}
+          clientId={caseData.client?.id}
+          signatureRequests={signatureRequestsList}
+        />
       </div>
 
       {/* Internal Notes Panel */}

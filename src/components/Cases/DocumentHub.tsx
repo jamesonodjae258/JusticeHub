@@ -19,11 +19,13 @@ interface DocumentHubProps {
   caseId: string
   documents: CaseDocument[]
   role: UserRole
+  clientId?: string
+  signatureRequests?: any[]
 }
 
 const TAG_OPTIONS = ['Pleadings', 'Correspondence', 'Evidence', 'Other']
 
-export function DocumentHub({ caseId, documents, role }: DocumentHubProps) {
+export function DocumentHub({ caseId, documents, role, clientId, signatureRequests = [] }: DocumentHubProps) {
   const isStaff = role === 'firm_admin' || role === 'attorney' || role === 'staff'
   const [isUploading, startUploadTransition] = useTransition()
   const [uploadError, setUploadError] = useState('')
@@ -213,6 +215,37 @@ export function DocumentHub({ caseId, documents, role }: DocumentHubProps) {
                       >
                         Download
                       </button>
+
+                      {role === 'attorney' && (
+                        <button
+                          className="btn btn--primary btn--sm"
+                          disabled={actionPendingId === doc.id}
+                          onClick={async () => {
+                            if (!clientId) {
+                              alert('Please assign a client to this case before requesting signatures.')
+                              return
+                            }
+                            setActionPendingId(doc.id)
+                            try {
+                              const { createSignatureRequest } = await import('@/actions/signature')
+                              const res = await createSignatureRequest({ caseId, documentId: doc.id, clientId })
+                              if (!res.success) alert(res.error || 'Failed to request signature')
+                              else {
+                                alert('Signature request sent to client!')
+                                window.location.reload()
+                              }
+                            } catch (e: any) {
+                              alert(e.message || 'Signature request error')
+                            } finally {
+                              setActionPendingId(null)
+                            }
+                          }}
+                          title="Request E-Signature from Client"
+                        >
+                          ✍️ Request Signature
+                        </button>
+                      )}
+
                       {isStaff && (
                         <button
                           className="btn btn--danger btn--sm"
@@ -231,6 +264,74 @@ export function DocumentHub({ caseId, documents, role }: DocumentHubProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Signature Requests Panel */}
+      {signatureRequests.length > 0 && (
+        <div className="profile-card" style={{ marginTop: '1.5rem' }}>
+          <h4 className="profile-card-title" style={{ fontSize: '15px', marginBottom: '12px' }}>
+            Signature Requests ({signatureRequests.length})
+          </h4>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {signatureRequests.map((req: any) => (
+              <div
+                key={req.id}
+                style={{
+                  padding: '12px 16px',
+                  background: 'var(--color-surface)',
+                  border: '0.5px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>
+                      {req.document_name}
+                    </span>
+                    <span className={`badge ${req.status === 'signed' ? 'badge--active' : req.status === 'declined' ? 'badge--urgent' : 'badge--admin'}`}>
+                      {req.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    Client: {req.client_name} • Requested: {formatDocDate(req.requested_at)}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {req.signed_doc_url && (
+                    <a href={req.signed_doc_url} target="_blank" rel="noopener noreferrer" className="btn btn--primary btn--sm">
+                      👁 View Signed PDF
+                    </a>
+                  )}
+
+                  {req.status === 'pending' && role === 'attorney' && (
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm"
+                      onClick={async () => {
+                        try {
+                          const { sendSignatureReminder } = await import('@/actions/signature')
+                          const res = await sendSignatureReminder(req.id)
+                          if (!res.success) alert(res.error || 'Failed to send reminder')
+                          else alert('Follow-up reminder sent to client!')
+                        } catch (e: any) {
+                          alert(e.message || 'Reminder error')
+                        }
+                      }}
+                      title="Follow up (Max once per 24 hours)"
+                    >
+                      ✉️ Follow Up
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
