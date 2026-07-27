@@ -53,10 +53,11 @@ export async function updateSession(request: NextRequest) {
   const isClientsRoute        = pathname.startsWith('/clients')
   const isDocumentsRoute      = pathname.startsWith('/documents')
   const isTeamRoute           = pathname.startsWith('/team')
+  const isSettingsRoute       = pathname.startsWith('/settings')
   const isSuperAdminRoute     = pathname.startsWith('/superadmin')
   const isPortalRoute         = pathname.startsWith('/portal')
   const isPortalLoginRoute    = isPortalRoute && pathname.endsWith('/login')
-  const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute || isTeamRoute
+  const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute || isTeamRoute || isSettingsRoute
 
   // ── Unauthenticated → send to login ──────────────────────────
   if (!user && (isProtectedStaffRoute || isSuperAdminRoute || (isPortalRoute && !isPortalLoginRoute))) {

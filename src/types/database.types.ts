@@ -171,6 +171,32 @@ export interface ProfileRow {
   updated_at: string
 }
 
+// Phase 2 — Firm settings
+export interface FirmSettingsRow {
+  firm_id: string
+  address: string | null
+  primary_email: string | null
+  phone: string | null
+  website_url: string | null
+  logo_url: string | null
+  logo_signed_url?: string | null
+  default_hourly_rate: number
+  default_payment_terms: string
+  invoice_currency: string
+  invoice_prefix: string
+  next_invoice_number: number
+  tax_label: string | null
+  tax_rate: number | null
+  bank_details: string | null
+  portal_header_message: string | null
+  allow_client_doc_download: boolean
+  show_attorney_phone_by_default: boolean
+  enforce_2fa: boolean
+  session_timeout: string
+  created_at: string
+  updated_at: string
+}
+
 // ──────────────────────────────────────────────────
 // Insert types (what you pass to INSERT)
 // ──────────────────────────────────────────────────

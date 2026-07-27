@@ -120,28 +120,54 @@ export function Sidebar({ userName, userRole, firmName, avatarUrl }: SidebarProp
           </Link>
 
           {userRole === 'firm_admin' && (
-            <Link
-              href="/team"
-              className={`nav-item${isActive('/team') ? ' nav-item--active' : ''}`}
-              id="nav-team"
-              onClick={() => setIsOpen(false)}
-            >
-              {/* Users Group — Tabler outline, 18px */}
-              <svg
-                width="18" height="18" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor"
-                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                aria-hidden="true"
+            <>
+              <Link
+                href="/team"
+                className={`nav-item${isActive('/team') ? ' nav-item--active' : ''}`}
+                id="nav-team"
+                onClick={() => setIsOpen(false)}
               >
-                <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
-                <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                <path d="M17 10h2a2 2 0 0 1 2 2v1" />
-                <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
-              </svg>
-              <span className="nav-text">Team</span>
-            </Link>
+                {/* Users Group — Tabler outline, 18px */}
+                <svg
+                  width="18" height="18" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                  <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+                  <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                  <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+                  <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                  <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+                </svg>
+                <span className="nav-text">Team</span>
+              </Link>
+
+              <Link
+                href="/settings/firm"
+                className={`nav-item${isActive('/settings/firm') ? ' nav-item--active' : ''}`}
+                id="nav-firm-settings"
+                onClick={() => setIsOpen(false)}
+              >
+                {/* Settings / Building — Tabler outline, 18px */}
+                <svg
+                  width="18" height="18" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 21l18 0" />
+                  <path d="M5 21v-14l8 -4v18" />
+                  <path d="M19 21v-10l-6 -4" />
+                  <path d="M9 9l0 .01" />
+                  <path d="M9 12l0 .01" />
+                  <path d="M9 15l0 .01" />
+                  <path d="M9 18l0 .01" />
+                </svg>
+                <span className="nav-text">Firm settings</span>
+              </Link>
+            </>
           )}
 
           <Link
