@@ -26,7 +26,7 @@ export default async function AppLayout({
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
+  if (!profile || !['super_admin', 'firm_admin', 'attorney', 'staff'].includes(profile.role)) {
     redirect('/auth/login')
   }
 

@@ -22,7 +22,7 @@ export default async function AccountSettingsPage() {
 
   if (!userProfile) redirect('/auth/login')
 
-  const { profile } = await getProfile()
+  const profile = await getProfile()
   const twoFactorStatus = await get2FAStatus()
 
   return (

@@ -19,7 +19,7 @@ interface AccountSettingsFormProps {
   userEmail: string
   userRole: string
   twoFactorStatus: { enabled: boolean; factorId?: string }
-  profile: ProfileRow | null
+  profile: any
 }
 
 type TabType = 'account' | 'notifications' | 'appearance'
