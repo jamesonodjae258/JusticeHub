@@ -5,6 +5,7 @@ import { ActivityLog } from '@/components/Cases/ActivityLog'
 import { DocumentHub } from '@/components/Cases/DocumentHub'
 import { TimerWidget } from '@/components/Cases/TimerWidget'
 import { TimeLog } from '@/components/Cases/TimeLog'
+import { InvoiceBuilderModal } from '@/components/Billing/InvoiceBuilderModal'
 import { createCaseEvent, createCaseNote } from '@/actions/collaboration'
 import { Button } from '@/components/ui/Button'
 import type { CaseStatus, TimeEntryRow } from '@/types/database.types'
@@ -54,7 +55,7 @@ interface CaseDetailTabsProps {
     matter_type: string
     created_at: string
     updated_at: string
-    client: { name: string } | null
+    client: { id?: string; name: string } | null
     assigned_user: { full_name: string } | null
   }
   logs: AuditLogEntry[]
@@ -89,6 +90,7 @@ export function CaseDetailTabs({
 }: CaseDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [timerDuration, setTimerDuration] = useState<number | null>(null)
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const [isNotePending, startNoteTransition] = useTransition()
   const [isEventPending, startEventTransition] = useTransition()
   const [noteError, setNoteError] = useState('')
@@ -415,6 +417,18 @@ export function CaseDetailTabs({
           aria-labelledby="tab-time"
           hidden={activeTab !== 'time'}
         >
+          {['attorney', 'firm_admin', 'super_admin'].includes(role) && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+              <button
+                type="button"
+                className="btn btn--primary btn--md"
+                onClick={() => setIsInvoiceModalOpen(true)}
+              >
+                📄 Generate Invoice
+              </button>
+            </div>
+          )}
+
           <TimeLog
             caseId={caseData.id}
             entries={timeEntries}
@@ -423,6 +437,16 @@ export function CaseDetailTabs({
             currentUserId={currentUserId}
             initialTimerDuration={timerDuration}
           />
+
+          {isInvoiceModalOpen && (
+            <InvoiceBuilderModal
+              caseId={caseData.id}
+              clientId={caseData.client?.id || ''}
+              clientName={caseData.client?.name || 'Client'}
+              caseTitle={caseData.title}
+              onClose={() => setIsInvoiceModalOpen(false)}
+            />
+          )}
         </div>
       )}
     </div>
