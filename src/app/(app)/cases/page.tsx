@@ -72,8 +72,9 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
       status,
       updated_at,
       created_at,
+      assigned_user_id,
       client:client_id(name),
-      assigned_user:user_profile(full_name)
+      assigned_user:user_profile(id, full_name)
     `)
     .eq('firm_id', profile.firm_id)
 
@@ -96,6 +97,57 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
   if (casesErr) {
     console.error('Error loading cases:', casesErr.message)
   }
+
+  // Collect assigned user IDs and fetch avatar URLs
+  const assignedUserIds = Array.from(
+    new Set((cases ?? []).map(c => c.assigned_user_id).filter((id): id is string => Boolean(id)))
+  )
+
+  let avatarUrlMap: Record<string, string> = {}
+  if (assignedUserIds.length > 0) {
+    const { data: assignedProfiles } = await supabase
+      .from('profiles')
+      .select('user_id, avatar_url')
+      .in('user_id', assignedUserIds)
+
+    const pathMap: Record<string, string> = {}
+    const pathsToSign: string[] = []
+
+    assignedProfiles?.forEach(p => {
+      if (p.avatar_url) {
+        pathMap[p.user_id] = p.avatar_url
+        pathsToSign.push(p.avatar_url)
+      }
+    })
+
+    const { getSignedAvatarUrls } = await import('@/actions/profile')
+    const signedMap = await getSignedAvatarUrls(pathsToSign)
+
+    Object.entries(pathMap).forEach(([uid, path]) => {
+      if (signedMap[path]) {
+        avatarUrlMap[uid] = signedMap[path]
+      }
+    })
+  }
+
+  // Map cases to format expected by CaseListTable
+  const formattedCases = (cases ?? []).map(c => {
+    const assignedUser = Array.isArray(c.assigned_user)
+      ? c.assigned_user[0]
+      : c.assigned_user
+    const userId = c.assigned_user_id
+
+    return {
+      ...c,
+      client: Array.isArray(c.client) ? c.client[0] : c.client,
+      assigned_user: assignedUser
+        ? {
+            full_name: assignedUser.full_name,
+            avatar_signed_url: userId ? (avatarUrlMap[userId] ?? null) : null,
+          }
+        : null,
+    }
+  })
 
   return (
     <>
@@ -132,7 +184,7 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
           </div>
         ) : (
           <CaseListTableWrapper
-            cases={cases as any[]}
+            cases={formattedCases as any[]}
             sortBy={sortColumn}
             sortDir={sortDir}
           />

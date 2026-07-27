@@ -11,7 +11,7 @@ interface CaseRow {
   status:           CaseStatus
   updated_at:       string
   client:           { name: string } | null
-  assigned_user:    { full_name: string } | null
+  assigned_user:    { full_name: string; avatar_signed_url?: string | null } | null
 }
 
 interface CaseListTableProps {
@@ -78,7 +78,27 @@ export function CaseListTable({ cases, sortBy, sortDir, onSort }: CaseListTableP
               <td className="case-client-name">{c.client?.name ?? '—'}</td>
               <td>{c.matter_type}</td>
               <td><StatusBadge status={c.status} /></td>
-              <td className="case-attorney">{c.assigned_user?.full_name ?? <span style={{ color: 'var(--color-border-strong)' }}>Unassigned</span>}</td>
+              <td className="case-attorney">
+                {c.assigned_user?.full_name ? (
+                  <div className="case-attorney-cell">
+                    {c.assigned_user.avatar_signed_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={c.assigned_user.avatar_signed_url}
+                        alt={c.assigned_user.full_name}
+                        className="case-attorney-avatar"
+                      />
+                    ) : (
+                      <span className="case-attorney-initial">
+                        {c.assigned_user.full_name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span>{c.assigned_user.full_name}</span>
+                  </div>
+                ) : (
+                  <span style={{ color: 'var(--color-border-strong)' }}>Unassigned</span>
+                )}
+              </td>
               <td className="case-date">{formatDate(c.updated_at)}</td>
               <td className="case-table-action">
                 <span style={{ color: 'var(--color-text-muted)', fontSize: '1rem' }} aria-hidden="true">›</span>

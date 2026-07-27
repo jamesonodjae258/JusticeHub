@@ -141,6 +141,36 @@ export interface FirmInvitationRow {
   created_at: string
 }
 
+// Phase 2 — Profiles
+export type PracticeArea =
+  | 'Civil'
+  | 'Criminal'
+  | 'Corporate'
+  | 'Family'
+  | 'Property'
+  | 'Immigration'
+  | 'Labour'
+  | 'Other'
+
+export interface ProfileRow {
+  user_id: string
+  firm_id: string
+  display_name: string
+  title: string | null
+  avatar_url: string | null
+  avatar_signed_url?: string | null
+  bio: string | null
+  phone: string | null
+  bar_number: string | null
+  practice_areas: PracticeArea[]
+  hourly_rate: number
+  show_phone_to_clients: boolean
+  notification_preferences: Json
+  preferred_language: string
+  created_at: string
+  updated_at: string
+}
+
 // ──────────────────────────────────────────────────
 // Insert types (what you pass to INSERT)
 // ──────────────────────────────────────────────────

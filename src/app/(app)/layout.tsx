@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/AppShell/Sidebar'
+import { getSignedAvatarUrl } from '@/actions/profile'
 
 /**
  * (app) route group layout
@@ -35,12 +36,24 @@ export default async function AppLayout({
     .eq('id', profile.firm_id)
     .single()
 
+  // Fetch avatar storage path from profiles table
+  const { data: userExtProfile } = await supabase
+    .from('profiles')
+    .select('avatar_url')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const avatarUrl = userExtProfile?.avatar_url
+    ? await getSignedAvatarUrl(userExtProfile.avatar_url)
+    : null
+
   return (
     <div className="app-shell">
       <Sidebar
         userName={profile.full_name}
         userRole={profile.role}
         firmName={firm?.name ?? 'Your Firm'}
+        avatarUrl={avatarUrl}
       />
       <div className="app-content-wrapper">
         {children}

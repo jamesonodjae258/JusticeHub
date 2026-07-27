@@ -10,9 +10,10 @@ interface SidebarProps {
   userName: string
   userRole: string
   firmName: string
+  avatarUrl?: string | null
 }
 
-export function Sidebar({ userName, userRole, firmName }: SidebarProps) {
+export function Sidebar({ userName, userRole, firmName, avatarUrl }: SidebarProps) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -168,14 +169,23 @@ export function Sidebar({ userName, userRole, firmName }: SidebarProps) {
 
         {/* User / sign-out */}
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            {/* Medium avatar: 36px — bg-primary-100 text-primary-dark */}
-            <div className="sidebar-avatar" aria-hidden="true">{initial}</div>
+          <Link
+            href="/profile"
+            className="sidebar-user"
+            onClick={() => setIsOpen(false)}
+            title="View profile settings"
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt={userName} className="sidebar-avatar-img" />
+            ) : (
+              <div className="sidebar-avatar" aria-hidden="true">{initial}</div>
+            )}
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{userName}</div>
               <div className="sidebar-user-role">{userRole.replace('_', ' ')}</div>
             </div>
-          </div>
+          </Link>
 
           {/* Desktop Manual Collapse Toggle Button */}
           <button
