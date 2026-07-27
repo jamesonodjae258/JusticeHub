@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getFirmSettings } from '@/actions/firmSettings'
 import { TopBar } from '@/components/AppShell/TopBar'
-import { SuperAdminSettingsView } from '@/components/Settings/SuperAdminSettingsView'
+import { FirmAdminSettingsView } from '@/components/Settings/FirmAdminSettingsView'
 
-export default async function SuperAdminFirmSettingsPage() {
+export default async function FirmAdminSettingsPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,8 +16,8 @@ export default async function SuperAdminFirmSettingsPage() {
     .eq('id', user.id)
     .single()
 
-  // STRICT 404 REQUIREMENT: Any role other than super_admin gets 404
-  if (!profile || profile.role !== 'super_admin') {
+  // STRICT 404 REQUIREMENT: Any role other than firm_admin gets 404
+  if (!profile || profile.role !== 'firm_admin') {
     notFound()
   }
 
@@ -26,9 +26,9 @@ export default async function SuperAdminFirmSettingsPage() {
 
   return (
     <>
-      <TopBar firmName={settings.firm_name} title="Firm Settings (Super Admin)" />
+      <TopBar firmName={settings.firm_name} title="Firm Settings (Firm Admin)" />
       <main className="app-content">
-        <SuperAdminSettingsView settings={settings} />
+        <FirmAdminSettingsView settings={settings} />
       </main>
     </>
   )
