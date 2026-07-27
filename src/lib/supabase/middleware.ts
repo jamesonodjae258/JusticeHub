@@ -59,8 +59,26 @@ export async function updateSession(request: NextRequest) {
   const isPortalLoginRoute    = isPortalRoute && pathname.endsWith('/login')
   const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute || isTeamRoute || isSettingsRoute
 
+  // ── SUPERADMIN ROUTE ISOLATION — MUST RETURN 404 TO NON-SUPERADMINS ──
+  if (isSuperAdminRoute) {
+    if (!user) {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+
+    const { data: saProfile } = await supabase
+      .from('user_profile')
+      .select('role, status')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!saProfile || saProfile.role !== 'super_admin' || saProfile.status === 'deactivated') {
+      // 404 rewrite — do not reveal that /superadmin route exists
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+  }
+
   // ── Unauthenticated → send to login ──────────────────────────
-  if (!user && (isProtectedStaffRoute || isSuperAdminRoute || (isPortalRoute && !isPortalLoginRoute))) {
+  if (!user && (isProtectedStaffRoute || (isPortalRoute && !isPortalLoginRoute))) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = isPortalRoute ? '/auth/client-login' : '/auth/login'
     loginUrl.searchParams.set('next', pathname)

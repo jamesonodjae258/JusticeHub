@@ -211,6 +211,37 @@ export interface FirmSettingsRow {
   updated_at: string
 }
 
+// Phase 2 — Super Admin & Features
+export type FirmStatus = 'active' | 'suspended'
+
+export interface FeatureFlagRow {
+  key: string
+  name: string
+  global_enabled: boolean
+  firm_overrides: Record<string, boolean>
+  updated_at: string
+}
+
+export interface PlatformEmailTemplateRow {
+  template_key: string
+  name: string
+  subject: string
+  body_html: string
+  updated_at: string
+}
+
+export interface SuperAdminDashboardStats {
+  totalFirms: number
+  firmsByTier: Record<string, number>
+  monthlyActiveUsers: number
+  totalCases: number
+  totalDocuments: number
+  totalInvoices: number
+  totalSignatures: number
+  newFirms90Days: { date: string; count: number }[]
+  maintenanceMode: boolean
+}
+
 // ──────────────────────────────────────────────────
 // Insert types (what you pass to INSERT)
 // ──────────────────────────────────────────────────
