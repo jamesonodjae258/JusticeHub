@@ -242,6 +242,23 @@ export interface SuperAdminDashboardStats {
   maintenanceMode: boolean
 }
 
+// Phase 2 — Time Tracking
+export interface TimeEntryRow {
+  id: string
+  case_id: string
+  user_id: string
+  firm_id: string
+  entry_date: string
+  duration_minutes: number
+  hourly_rate: number
+  is_billable: boolean
+  description: string
+  invoice_id: string | null
+  created_at: string
+  updated_at: string
+  user?: { full_name: string; avatar_url?: string | null; avatar_signed_url?: string | null } | null
+}
+
 // ──────────────────────────────────────────────────
 // Insert types (what you pass to INSERT)
 // ──────────────────────────────────────────────────

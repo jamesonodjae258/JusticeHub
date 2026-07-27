@@ -7,6 +7,7 @@ import { CaseDetailHeader } from '@/components/Cases/CaseDetailHeader'
 import { CaseDetailTabs } from '@/components/Cases/CaseDetailTabs'
 import { InviteClientButton } from '@/components/Cases/InviteClientButton'
 import { TopBar } from '@/components/AppShell/TopBar'
+import { getTimeEntriesForCase } from '@/actions/timeTracking'
 import type { CaseStatus } from '@/types/database.types'
 
 interface CaseDetailPageProps {
@@ -187,6 +188,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
+  // 9. Fetch Time Entries & Totals for this case
+  const timeData = await getTimeEntriesForCase(caseId)
+
   return (
     <>
       <TopBar firmName={firm?.name ?? 'Your Firm'} title="Case Details" />
@@ -228,6 +232,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                 role={profile.role as any}
                 notes={mappedNotes}
                 events={mappedEvents}
+                timeEntries={timeData.entries}
+                timeTotals={timeData.totals}
+                currentUserId={user.id}
               />
             </div>
           </div>

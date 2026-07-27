@@ -3,9 +3,11 @@
 import React, { useState, useTransition } from 'react'
 import { ActivityLog } from '@/components/Cases/ActivityLog'
 import { DocumentHub } from '@/components/Cases/DocumentHub'
+import { TimerWidget } from '@/components/Cases/TimerWidget'
+import { TimeLog } from '@/components/Cases/TimeLog'
 import { createCaseEvent, createCaseNote } from '@/actions/collaboration'
 import { Button } from '@/components/ui/Button'
-import type { CaseStatus } from '@/types/database.types'
+import type { CaseStatus, TimeEntryRow } from '@/types/database.types'
 
 interface AuditLogEntry {
   id: string
@@ -58,12 +60,20 @@ interface CaseDetailTabsProps {
   logs: AuditLogEntry[]
   staffList: Staff[]
   documents: CaseDocument[]
-  role: 'firm_admin' | 'staff' | 'client'
+  role: 'firm_admin' | 'attorney' | 'staff' | 'client'
   notes: CaseNote[]
   events: CaseEvent[]
+  timeEntries?: TimeEntryRow[]
+  timeTotals?: {
+    totalHours: number
+    totalBillableAmount: number
+    totalUnbilledAmount: number
+    unbilledHours: number
+  }
+  currentUserId?: string
 }
 
-type TabType = 'overview' | 'activity' | 'documents' | 'notes'
+type TabType = 'overview' | 'activity' | 'documents' | 'notes' | 'time'
 
 export function CaseDetailTabs({
   caseData,
@@ -73,11 +83,22 @@ export function CaseDetailTabs({
   role,
   notes,
   events,
+  timeEntries = [],
+  timeTotals = { totalHours: 0, totalBillableAmount: 0, totalUnbilledAmount: 0, unbilledHours: 0 },
+  currentUserId,
 }: CaseDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const [timerDuration, setTimerDuration] = useState<number | null>(null)
   const [isNotePending, startNoteTransition] = useTransition()
   const [isEventPending, startEventTransition] = useTransition()
   const [noteError, setNoteError] = useState('')
+
+  const canLogTime = ['attorney', 'firm_admin'].includes(role)
+
+  function handleTimerStop(elapsedMinutes: number) {
+    setTimerDuration(elapsedMinutes)
+    setActiveTab('time')
+  }
   const [eventError, setEventError] = useState('')
 
   const handleAddNote = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -169,7 +190,30 @@ export function CaseDetailTabs({
         >
           Notes
         </button>
+        {role !== 'client' && (
+          <button
+            role="tab"
+            aria-selected={activeTab === 'time'}
+            aria-controls="panel-time"
+            id="tab-time"
+            className={`case-tab btn--ghost ${activeTab === 'time' ? 'case-tab--active' : ''}`}
+            onClick={() => setActiveTab('time')}
+          >
+            Time & Billing
+          </button>
+        )}
       </div>
+
+      {/* Floating Timer Widget for Attorneys */}
+      {canLogTime && (
+        <div style={{ marginBottom: '16px' }}>
+          <TimerWidget
+            caseId={caseData.id}
+            caseTitle={caseData.title}
+            onTimerStop={handleTimerStop}
+          />
+        </div>
+      )}
 
       {/* Tab Panels */}
       
@@ -362,6 +406,25 @@ export function CaseDetailTabs({
           </div>
         </div>
       </div>
+
+      {/* Time & Billing Panel */}
+      {role !== 'client' && (
+        <div
+          id="panel-time"
+          role="tabpanel"
+          aria-labelledby="tab-time"
+          hidden={activeTab !== 'time'}
+        >
+          <TimeLog
+            caseId={caseData.id}
+            entries={timeEntries}
+            totals={timeTotals}
+            userRole={role}
+            currentUserId={currentUserId}
+            initialTimerDuration={timerDuration}
+          />
+        </div>
+      )}
     </div>
   )
 }
