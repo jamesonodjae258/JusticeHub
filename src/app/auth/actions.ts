@@ -60,6 +60,27 @@ export async function signUp(formData: FormData) {
   redirect('/auth/signup?success=check_email')
 }
 
+async function recordLoginAudit(userId: string | null, firmId: string | null, success: boolean) {
+  try {
+    const adminSupabase = await createAdminClient()
+    const headersList = await headers()
+    const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || '127.0.0.1'
+    const userAgent = headersList.get('user-agent') || 'Unknown User-Agent'
+    const device = userAgent.includes('Mobile') ? 'Mobile Device' : (userAgent.includes('Mac') ? 'Macintosh' : 'Windows PC')
+
+    await adminSupabase.from('login_audit').insert({
+      user_id:    userId,
+      firm_id:    firmId,
+      ip_address: ipAddress,
+      device:     device,
+      user_agent: userAgent,
+      success:    success,
+    })
+  } catch (err) {
+    console.error('[login_audit] Failed to write entry:', err)
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // STAFF / ADMIN LOGIN
 // ─────────────────────────────────────────────────────────────
@@ -71,16 +92,28 @@ export async function signIn(formData: FormData) {
   const next     = (formData.get('next') as string) || '/dashboard'
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      await recordLoginAudit(null, null, false)
       const msg = error.message.toLowerCase().includes('fetch failed')
         ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
         : error.message
       redirect(`/auth/login?error=${encodeURIComponent(msg)}`)
     }
+
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from('user_profile')
+        .select('firm_id')
+        .eq('id', authData.user.id)
+        .maybeSingle()
+
+      await recordLoginAudit(authData.user.id, profile?.firm_id ?? null, true)
+    }
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+    await recordLoginAudit(null, null, false)
     const msg = err?.message?.toLowerCase().includes('fetch failed')
       ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
       : (err?.message || 'Failed to sign in')
@@ -142,16 +175,22 @@ export async function clientSignIn(formData: FormData) {
 
   try {
     // Log in using email + password
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      await recordLoginAudit(null, firm.id, false)
       const msg = error.message.toLowerCase().includes('fetch failed')
         ? 'Unable to connect to Supabase authentication service. Please check network/Vercel environment variables.'
         : error.message
       redirect(`/portal/${slug}/login?error=${encodeURIComponent(msg)}`)
     }
+
+    if (authData.user) {
+      await recordLoginAudit(authData.user.id, firm.id, true)
+    }
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+    await recordLoginAudit(null, firm.id, false)
     const msg = err?.message?.toLowerCase().includes('fetch failed')
       ? 'Unable to connect to Supabase authentication service. Please check network/Vercel environment variables.'
       : (err?.message || 'Login failed')
