@@ -8,6 +8,7 @@ import { CaseDetailTabs } from '@/components/Cases/CaseDetailTabs'
 import { InviteClientButton } from '@/components/Cases/InviteClientButton'
 import { TopBar } from '@/components/AppShell/TopBar'
 import { getTimeEntriesForCase } from '@/actions/timeTracking'
+import { getInvoicesForCase } from '@/actions/invoices'
 import type { CaseStatus } from '@/types/database.types'
 
 interface CaseDetailPageProps {
@@ -188,8 +189,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
-  // 9. Fetch Time Entries & Totals for this case
+  // 9. Fetch Time Entries & Totals & Invoices for this case
   const timeData = await getTimeEntriesForCase(caseId)
+  const invoicesList = await getInvoicesForCase(caseId)
 
   return (
     <>
@@ -234,6 +236,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                 events={mappedEvents}
                 timeEntries={timeData.entries}
                 timeTotals={timeData.totals}
+                invoicesList={invoicesList}
                 currentUserId={user.id}
               />
             </div>

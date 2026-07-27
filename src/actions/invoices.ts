@@ -262,6 +262,245 @@ export async function createInvoiceDraft(payload: CreateInvoicePayload): Promise
   }
 }
 
+/** Mark invoice as SENT and record sent_at */
+export async function sendInvoiceToClient(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: userProfile } = await adminSupabase
+    .from('user_profile')
+    .select('firm_id, role')
+    .eq('id', user.id)
+    .single()
+
+  if (!userProfile || !['super_admin', 'firm_admin', 'attorney'].includes(userProfile.role)) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const { data: invoice, error: fetchErr } = await adminSupabase
+    .from('invoices')
+    .select('id, case_id, client_id, status, invoice_number, total_amount, url_token')
+    .eq('id', invoiceId)
+    .eq('firm_id', userProfile.firm_id)
+    .single()
+
+  if (fetchErr || !invoice) return { success: false, error: 'Invoice not found.' }
+
+  const nowIso = new Date().toISOString()
+  const { error: updateErr } = await adminSupabase
+    .from('invoices')
+    .update({
+      status:     'sent',
+      sent_at:    nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', invoiceId)
+
+  if (updateErr) return { success: false, error: updateErr.message }
+
+  // Send Notification alert to client
+  const { data: client } = await adminSupabase
+    .from('client')
+    .select('auth_user_id')
+    .eq('id', invoice.client_id)
+    .single()
+
+  if (client?.auth_user_id) {
+    await adminSupabase.from('notifications').insert({
+      recipient_id: client.auth_user_id,
+      event_type:   'invoice.sent',
+      message:      `New invoice ${invoice.invoice_number} (₦${invoice.total_amount.toLocaleString()}) issued.`,
+      payload:      { invoice_id: invoice.id, url_token: invoice.url_token },
+    })
+  }
+
+  await writeAuditLog({
+    firmId:     userProfile.firm_id,
+    actorId:    user.id,
+    action:     'invoice.sent',
+    entityType: 'invoices',
+    entityId:   invoiceId,
+    payload:    { invoice_number: invoice.invoice_number },
+  })
+
+  revalidatePath(`/cases/${invoice.case_id}`)
+  return { success: true }
+}
+
+/** Mark invoice as PAID and record paid_at */
+export async function markInvoiceAsPaid(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: userProfile } = await adminSupabase
+    .from('user_profile')
+    .select('firm_id, role')
+    .eq('id', user.id)
+    .single()
+
+  if (!userProfile || !['super_admin', 'firm_admin', 'attorney'].includes(userProfile.role)) {
+    return { success: false, error: 'Unauthorized' }
+  }
+
+  const { data: invoice } = await adminSupabase
+    .from('invoices')
+    .select('id, case_id, invoice_number')
+    .eq('id', invoiceId)
+    .eq('firm_id', userProfile.firm_id)
+    .single()
+
+  if (!invoice) return { success: false, error: 'Invoice not found.' }
+
+  const nowIso = new Date().toISOString()
+  const { error: updateErr } = await adminSupabase
+    .from('invoices')
+    .update({
+      status:     'paid',
+      paid_at:    nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', invoiceId)
+
+  if (updateErr) return { success: false, error: updateErr.message }
+
+  await writeAuditLog({
+    firmId:     userProfile.firm_id,
+    actorId:    user.id,
+    action:     'invoice.paid',
+    entityType: 'invoices',
+    entityId:   invoiceId,
+    payload:    { invoice_number: invoice.invoice_number },
+  })
+
+  revalidatePath(`/cases/${invoice.case_id}`)
+  return { success: true }
+}
+
+/** Public action for hosted invoice view (/invoice/[url_token]) */
+export async function getHostedInvoiceByToken(urlToken: string) {
+  const adminSupabase = await createAdminClient()
+
+  const { data: invoice } = await adminSupabase
+    .from('invoices')
+    .select('*')
+    .eq('url_token', urlToken)
+    .maybeSingle()
+
+  if (!invoice) return null
+
+  // If status is currently 'sent', update to 'viewed' upon client access
+  if (invoice.status === 'sent') {
+    await adminSupabase
+      .from('invoices')
+      .update({ status: 'viewed', updated_at: new Date().toISOString() })
+      .eq('id', invoice.id)
+
+    invoice.status = 'viewed'
+  }
+
+  // Fetch Firm branding & settings
+  const { data: firm } = await adminSupabase
+    .from('firm')
+    .select('name')
+    .eq('id', invoice.firm_id)
+    .single()
+
+  const { data: firmSett } = await adminSupabase
+    .from('firm_settings')
+    .select('*')
+    .eq('firm_id', invoice.firm_id)
+    .maybeSingle()
+
+  // Fetch Client details
+  const { data: client } = await adminSupabase
+    .from('client')
+    .select('name, email')
+    .eq('id', invoice.client_id)
+    .single()
+
+  return {
+    invoice,
+    firmName:     firm?.name || 'Law Firm',
+    firmSettings: firmSett,
+    clientName:   client?.name || 'Client',
+    clientEmail:  client?.email || null,
+  }
+}
+
+/** Idempotent Overdue Reminder Runner (Daily cron schedule 0 8 * * *) */
+export async function processOverdueInvoiceReminders(): Promise<{ processedCount: number; errors: string[] }> {
+  const adminSupabase = await createAdminClient()
+
+  const today = new Date()
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const fourteenDaysAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+  // Fetch candidate overdue invoices
+  const { data: candidateInvoices } = await adminSupabase
+    .from('invoices')
+    .select('id, firm_id, client_id, invoice_number, due_date, status, url_token')
+    .in('status', ['sent', 'viewed'])
+    .lte('due_date', sevenDaysAgo)
+
+  let processedCount = 0
+  const errors: string[] = []
+
+  for (const inv of candidateInvoices ?? []) {
+    let reminderType: '7day' | '14day' | null = null
+
+    if (inv.due_date <= fourteenDaysAgo) {
+      reminderType = '14day'
+    } else if (inv.due_date <= sevenDaysAgo) {
+      reminderType = '7day'
+    }
+
+    if (!reminderType) continue
+
+    // Check if reminder for this invoice + type already exists (Idempotency check)
+    const { data: existing } = await adminSupabase
+      .from('invoice_reminders')
+      .select('id')
+      .eq('invoice_id', inv.id)
+      .eq('type', reminderType)
+      .maybeSingle()
+
+    if (existing) continue // Skip duplicate
+
+    // Insert reminder lock row (UNIQUE constraint prevents race condition)
+    const { error: insertErr } = await adminSupabase
+      .from('invoice_reminders')
+      .insert({
+        invoice_id: inv.id,
+        type:       reminderType,
+        sent_at:    new Date().toISOString(),
+      })
+
+    if (insertErr) {
+      errors.push(`Failed to record reminder for invoice ${inv.invoice_number}: ${insertErr.message}`)
+      continue
+    }
+
+    // Record reminder sent on invoice row
+    await adminSupabase
+      .from('invoices')
+      .update({
+        status:           'overdue',
+        reminder_sent_at: new Date().toISOString(),
+      })
+      .eq('id', inv.id)
+
+    processedCount++
+  }
+
+  return { processedCount, errors }
+}
+
 /** Fetch invoices for a case */
 export async function getInvoicesForCase(caseId: string) {
   const adminSupabase = await createAdminClient()

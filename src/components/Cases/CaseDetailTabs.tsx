@@ -86,8 +86,9 @@ export function CaseDetailTabs({
   events,
   timeEntries = [],
   timeTotals = { totalHours: 0, totalBillableAmount: 0, totalUnbilledAmount: 0, unbilledHours: 0 },
+  invoicesList = [],
   currentUserId,
-}: CaseDetailTabsProps) {
+}: CaseDetailTabsProps & { invoicesList?: any[] }) {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [timerDuration, setTimerDuration] = useState<number | null>(null)
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -426,6 +427,84 @@ export function CaseDetailTabs({
               >
                 📄 Generate Invoice
               </button>
+            </div>
+          )}
+
+          {/* Case Invoices Summary Section */}
+          {invoicesList.length > 0 && (
+            <div className="profile-card" style={{ marginBottom: '24px' }}>
+              <h3 className="profile-card-title" style={{ fontSize: '15px', marginBottom: '12px' }}>
+                Case Invoices ({invoicesList.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {invoicesList.map((inv: any) => (
+                  <div
+                    key={inv.id}
+                    style={{
+                      padding: '12px 16px',
+                      background: 'var(--color-surface)',
+                      border: '0.5px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                          {inv.invoice_number}
+                        </span>
+                        <span className={`badge ${inv.status === 'paid' ? 'badge--active' : inv.status === 'overdue' ? 'badge--urgent' : 'badge--admin'}`}>
+                          {inv.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        Issue: {inv.issue_date} • Due: {inv.due_date} • Total: ₦{inv.total_amount?.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {inv.pdf_url && (
+                        <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm">
+                          📄 PDF
+                        </a>
+                      )}
+                      <a href={`/invoice/${inv.url_token}`} target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm">
+                        🔗 Hosted View
+                      </a>
+
+                      {['super_admin', 'firm_admin', 'attorney'].includes(role) && inv.status === 'draft' && (
+                        <button
+                          type="button"
+                          className="btn btn--primary btn--sm"
+                          onClick={async () => {
+                            const { sendInvoiceToClient } = await import('@/actions/invoices')
+                            await sendInvoiceToClient(inv.id)
+                            window.location.reload()
+                          }}
+                        >
+                          ✉️ Send Invoice
+                        </button>
+                      )}
+
+                      {['super_admin', 'firm_admin', 'attorney'].includes(role) && inv.status !== 'paid' && (
+                        <button
+                          type="button"
+                          className="btn btn--secondary btn--sm"
+                          onClick={async () => {
+                            const { markInvoiceAsPaid } = await import('@/actions/invoices')
+                            await markInvoiceAsPaid(inv.id)
+                            window.location.reload()
+                          }}
+                        >
+                          ✓ Mark as Paid
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
