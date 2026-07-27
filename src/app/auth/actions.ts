@@ -29,22 +29,32 @@ export async function signUp(formData: FormData) {
   const protocol = host?.includes('localhost') ? 'http' : 'https'
   const siteUrl = `${protocol}://${host}`
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      // Pass firm name and full name through the email confirmation flow
-      data: {
-        full_name: fullName,
-        firm_name: firmName,
-        role: 'firm_admin',
+  try {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          firm_name: firmName,
+          role: 'firm_admin',
+        },
+        emailRedirectTo: `${siteUrl}/auth/confirm`,
       },
-      emailRedirectTo: `${siteUrl}/auth/confirm`,
-    },
-  })
+    })
 
-  if (error) {
-    redirect(`/auth/signup?error=${encodeURIComponent(error.message)}`)
+    if (error) {
+      const msg = error.message.toLowerCase().includes('fetch failed')
+        ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
+        : error.message
+      redirect(`/auth/signup?error=${encodeURIComponent(msg)}`)
+    }
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+    const msg = err?.message?.toLowerCase().includes('fetch failed')
+      ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
+      : (err?.message || 'Failed to sign up')
+    redirect(`/auth/signup?error=${encodeURIComponent(msg)}`)
   }
 
   redirect('/auth/signup?success=check_email')
@@ -60,10 +70,21 @@ export async function signIn(formData: FormData) {
   const password = formData.get('password') as string
   const next     = (formData.get('next') as string) || '/dashboard'
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-  if (error) {
-    redirect(`/auth/login?error=${encodeURIComponent(error.message)}`)
+    if (error) {
+      const msg = error.message.toLowerCase().includes('fetch failed')
+        ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
+        : error.message
+      redirect(`/auth/login?error=${encodeURIComponent(msg)}`)
+    }
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+    const msg = err?.message?.toLowerCase().includes('fetch failed')
+      ? 'Unable to connect to Supabase authentication service. Please verify network or Vercel environment variables (NEXT_PUBLIC_SUPABASE_URL).'
+      : (err?.message || 'Failed to sign in')
+    redirect(`/auth/login?error=${encodeURIComponent(msg)}`)
   }
 
   revalidatePath('/', 'layout')
@@ -119,11 +140,22 @@ export async function clientSignIn(formData: FormData) {
     redirect(`/portal/${slug}/login?error=no_portal_access`)
   }
 
-  // Log in using email + password
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  try {
+    // Log in using email + password
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-  if (error) {
-    redirect(`/portal/${slug}/login?error=${encodeURIComponent(error.message)}`)
+    if (error) {
+      const msg = error.message.toLowerCase().includes('fetch failed')
+        ? 'Unable to connect to Supabase authentication service. Please check network/Vercel environment variables.'
+        : error.message
+      redirect(`/portal/${slug}/login?error=${encodeURIComponent(msg)}`)
+    }
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+    const msg = err?.message?.toLowerCase().includes('fetch failed')
+      ? 'Unable to connect to Supabase authentication service. Please check network/Vercel environment variables.'
+      : (err?.message || 'Login failed')
+    redirect(`/portal/${slug}/login?error=${encodeURIComponent(msg)}`)
   }
 
   revalidatePath('/', 'layout')
