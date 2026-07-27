@@ -191,6 +191,26 @@ export function Sidebar({ userName, userRole, firmName, avatarUrl }: SidebarProp
             </svg>
             <span className="nav-text">Documents</span>
           </Link>
+
+          <Link
+            href="/settings/account"
+            className={`nav-item${isActive('/settings/account') ? ' nav-item--active' : ''}`}
+            id="nav-account-settings"
+            onClick={() => setIsOpen(false)}
+          >
+            {/* User Settings — Tabler outline, 18px */}
+            <svg
+              width="18" height="18" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor"
+              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+              <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+              <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
+            </svg>
+            <span className="nav-text">Account settings</span>
+          </Link>
         </nav>
 
         {/* User / sign-out */}

@@ -152,6 +152,20 @@ export type PracticeArea =
   | 'Labour'
   | 'Other'
 
+export interface NotificationChannel {
+  email: boolean
+  in_app: boolean
+}
+
+export interface NotificationPreferences {
+  case_status?: NotificationChannel
+  doc_upload?: NotificationChannel
+  court_dates?: NotificationChannel
+  assignments?: NotificationChannel
+  billing?: NotificationChannel
+  e_signature?: NotificationChannel
+}
+
 export interface ProfileRow {
   user_id: string
   firm_id: string
@@ -165,7 +179,7 @@ export interface ProfileRow {
   practice_areas: PracticeArea[]
   hourly_rate: number
   show_phone_to_clients: boolean
-  notification_preferences: Json
+  notification_preferences: NotificationPreferences | Json
   preferred_language: string
   created_at: string
   updated_at: string
