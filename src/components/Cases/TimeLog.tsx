@@ -48,7 +48,7 @@ export function TimeLog({
   initialTimerDuration,
 }: TimeLogProps) {
   const router = useRouter()
-  const canLogTime = ['attorney', 'firm_admin'].includes(userRole)
+  const canLogTime = userRole === 'attorney'
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)

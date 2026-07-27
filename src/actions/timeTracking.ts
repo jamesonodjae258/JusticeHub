@@ -23,8 +23,8 @@ async function requireAttorneyUser() {
     throw new Error('Account deactivated')
   }
 
-  if (!['attorney', 'firm_admin'].includes(profile.role)) {
-    throw new Error('Only attorneys and firm admins can log time')
+  if (profile.role !== 'attorney') {
+    throw new Error('Only attorneys can log time')
   }
 
   return { supabase, user, profile }

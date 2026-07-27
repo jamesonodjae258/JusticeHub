@@ -93,7 +93,7 @@ export function CaseDetailTabs({
   const [isEventPending, startEventTransition] = useTransition()
   const [noteError, setNoteError] = useState('')
 
-  const canLogTime = ['attorney', 'firm_admin'].includes(role)
+  const canLogTime = role === 'attorney'
 
   function handleTimerStop(elapsedMinutes: number) {
     setTimerDuration(elapsedMinutes)
