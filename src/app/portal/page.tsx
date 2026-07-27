@@ -96,22 +96,24 @@ export default async function PortalPage() {
         style={{
           borderBottom: '1px solid var(--color-border)',
           background: 'var(--color-surface)',
-          padding: '0 2rem',
+          padding: '0 1.5rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <JusticeHubLogo variant="light" size="1.25rem" />
-          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginLeft: '0.5rem', borderLeft: '1px solid var(--color-border)', paddingLeft: '0.5rem' }}>
-            Client Portal
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <span className="topbar-firm">{firm?.name ?? 'Law Practice'}</span>
-          <form action={signOut}>
-            <button type="submit" id="portal-signout-btn" className="btn btn--secondary btn--sm">
-              Sign out
-            </button>
-          </form>
+        <div style={{ maxWidth: '960px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <JusticeHubLogo variant="light" size="1.25rem" />
+            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginLeft: '0.5rem', borderLeft: '1px solid var(--color-border)', paddingLeft: '0.5rem' }}>
+              Client Portal
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <span className="topbar-firm">{firm?.name ?? 'Law Practice'}</span>
+            <form action={signOut}>
+              <button type="submit" id="portal-signout-btn" className="btn btn--secondary btn--sm">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 

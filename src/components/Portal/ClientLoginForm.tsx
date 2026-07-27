@@ -134,6 +134,26 @@ export function ClientLoginForm({
           >
             Sign in with Password
           </button>
+
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('testclient@gmail.com')
+                setPassword('ClientPass123!')
+                setStep('password')
+              }}
+              className="auth-btn"
+              style={{
+                background: 'var(--color-primary-light, #3b82f6)',
+                color: 'white',
+                marginTop: '0.5rem',
+                border: 'none',
+              }}
+            >
+              ⚡ Dev Auto-fill (Test Client)
+            </button>
+          )}
         </form>
       )}
 
@@ -248,6 +268,25 @@ export function ClientLoginForm({
           >
             Sign in with Code
           </button>
+
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('testclient@gmail.com')
+                setPassword('ClientPass123!')
+              }}
+              className="auth-btn"
+              style={{
+                background: 'var(--color-primary-light, #3b82f6)',
+                color: 'white',
+                marginTop: '0.5rem',
+                border: 'none',
+              }}
+            >
+              ⚡ Dev Auto-fill (Test Client)
+            </button>
+          )}
         </form>
       )}
 

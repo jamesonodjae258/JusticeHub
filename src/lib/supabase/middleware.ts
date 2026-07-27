@@ -5,11 +5,14 @@ import { NextResponse, type NextRequest } from 'next/server'
  * Refreshes the Supabase auth session on every request.
  * Must be called from src/proxy.ts.
  *
- * Route map:
- *   /cases/*     → staff + admin only
- *   /dashboard/* → staff + admin only
- *   /portal/*    → clients only
- *   /auth/*      → public (redirect to correct home if already authed)
+ * Route map (Phase 2 — 5 roles):
+ *   /cases/*      → firm_admin + attorney + staff
+ *   /dashboard/*  → firm_admin + attorney + staff
+ *   /clients/*    → firm_admin + attorney + staff
+ *   /documents/*  → firm_admin + attorney + staff
+ *   /superadmin/* → super_admin only
+ *   /portal/*     → clients only
+ *   /auth/*       → public (redirect to correct home if already authed)
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -49,11 +52,14 @@ export async function updateSession(request: NextRequest) {
   const isCasesRoute          = pathname.startsWith('/cases')
   const isClientsRoute        = pathname.startsWith('/clients')
   const isDocumentsRoute      = pathname.startsWith('/documents')
+  const isTeamRoute           = pathname.startsWith('/team')
+  const isSuperAdminRoute     = pathname.startsWith('/superadmin')
   const isPortalRoute         = pathname.startsWith('/portal')
-  const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute
+  const isPortalLoginRoute    = isPortalRoute && pathname.endsWith('/login')
+  const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute || isTeamRoute
 
   // ── Unauthenticated → send to login ──────────────────────────
-  if (!user && (isProtectedStaffRoute || isPortalRoute)) {
+  if (!user && (isProtectedStaffRoute || isSuperAdminRoute || (isPortalRoute && !isPortalLoginRoute))) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = isPortalRoute ? '/auth/client-login' : '/auth/login'
     loginUrl.searchParams.set('next', pathname)
@@ -70,7 +76,7 @@ export async function updateSession(request: NextRequest) {
     // Fetch profile and client records in parallel
     const [clientRes, profileRes] = await Promise.all([
       supabase.from('client').select('id').eq('auth_user_id', user.id).maybeSingle(),
-      supabase.from('user_profile').select('role').eq('id', user.id).maybeSingle()
+      supabase.from('user_profile').select('role, status').eq('id', user.id).maybeSingle()
     ])
 
     const clientRow = clientRes.data
@@ -85,10 +91,50 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
+    // Block deactivated users
+    if (profile?.status === 'deactivated') {
+      await supabase.auth.signOut()
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/auth/login'
+      loginUrl.searchParams.set('error', 'account_deactivated')
+      return NextResponse.redirect(loginUrl)
+    }
+
     const homeUrl = request.nextUrl.clone()
-    homeUrl.pathname = clientRow ? '/portal' : '/dashboard'
+    if (profile?.role === 'super_admin') {
+      homeUrl.pathname = '/superadmin'
+    } else if (clientRow) {
+      homeUrl.pathname = '/portal'
+    } else {
+      homeUrl.pathname = '/dashboard'
+    }
     homeUrl.search = ''
     return NextResponse.redirect(homeUrl)
+  }
+
+  // ── Super admin trying to access firm routes → superadmin home ──
+  if (user && (isProtectedStaffRoute || isPortalRoute)) {
+    const { data: profile } = await supabase
+      .from('user_profile')
+      .select('role, status')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    // Block deactivated users
+    if (profile?.status === 'deactivated') {
+      await supabase.auth.signOut()
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/auth/login'
+      loginUrl.searchParams.set('error', 'account_deactivated')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (profile?.role === 'super_admin') {
+      const superUrl = request.nextUrl.clone()
+      superUrl.pathname = '/superadmin'
+      superUrl.search = ''
+      return NextResponse.redirect(superUrl)
+    }
   }
 
   // ── Client user trying to access staff routes → portal ───────
@@ -107,7 +153,7 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // ── Staff user trying to access portal route → dashboard ──────
+  // ── Staff/attorney/admin user trying to access portal route → dashboard ──
   if (user && isPortalRoute) {
     const { data: profile } = await supabase
       .from('user_profile')
@@ -115,7 +161,7 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .maybeSingle()
 
-    if (profile && ['firm_admin', 'staff'].includes(profile.role)) {
+    if (profile && ['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
       const dashboardUrl = request.nextUrl.clone()
       dashboardUrl.pathname = '/dashboard'
       dashboardUrl.search = ''
@@ -123,6 +169,21 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // ── Non-super-admin trying to access /superadmin → their home ──
+  if (user && isSuperAdminRoute) {
+    const { data: profile } = await supabase
+      .from('user_profile')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile?.role !== 'super_admin') {
+      const homeUrl = request.nextUrl.clone()
+      homeUrl.pathname = profile ? '/dashboard' : '/portal'
+      homeUrl.search = ''
+      return NextResponse.redirect(homeUrl)
+    }
+  }
+
   return supabaseResponse
 }
-

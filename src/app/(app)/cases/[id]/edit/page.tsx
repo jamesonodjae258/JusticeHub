@@ -25,7 +25,7 @@ export default async function EditCasePage({ params }: EditCasePageProps) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'staff'].includes(profile.role)) {
+  if (!profile || !['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
     redirect('/auth/login')
   }
 
@@ -52,7 +52,7 @@ export default async function EditCasePage({ params }: EditCasePageProps) {
     .from('user_profile')
     .select('id, full_name')
     .eq('firm_id', profile.firm_id)
-    .in('role', ['firm_admin', 'staff'])
+    .in('role', ['firm_admin', 'attorney', 'staff'])
     .order('full_name')
 
   return (

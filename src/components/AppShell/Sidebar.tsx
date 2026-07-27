@@ -118,6 +118,31 @@ export function Sidebar({ userName, userRole, firmName }: SidebarProps) {
             <span className="nav-text">Clients</span>
           </Link>
 
+          {userRole === 'firm_admin' && (
+            <Link
+              href="/team"
+              className={`nav-item${isActive('/team') ? ' nav-item--active' : ''}`}
+              id="nav-team"
+              onClick={() => setIsOpen(false)}
+            >
+              {/* Users Group — Tabler outline, 18px */}
+              <svg
+                width="18" height="18" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+                <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+                <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+              </svg>
+              <span className="nav-text">Team</span>
+            </Link>
+          )}
+
           <Link
             href="/documents"
             className={`nav-item${isActive('/documents') ? ' nav-item--active' : ''}`}

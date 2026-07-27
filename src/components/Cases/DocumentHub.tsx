@@ -4,6 +4,8 @@ import React, { useState, useTransition } from 'react'
 import { uploadDocument, deleteDocument, toggleDocumentVisibility, getSignedDownloadUrl } from '@/actions/documents'
 import { Button } from '@/components/ui/Button'
 
+import { UserRole } from '@/types/database.types'
+
 interface CaseDocument {
   id: string
   filename: string
@@ -16,13 +18,13 @@ interface CaseDocument {
 interface DocumentHubProps {
   caseId: string
   documents: CaseDocument[]
-  role: 'firm_admin' | 'staff' | 'client'
+  role: UserRole
 }
 
 const TAG_OPTIONS = ['Pleadings', 'Correspondence', 'Evidence', 'Other']
 
 export function DocumentHub({ caseId, documents, role }: DocumentHubProps) {
-  const isStaff = role === 'firm_admin' || role === 'staff'
+  const isStaff = role === 'firm_admin' || role === 'attorney' || role === 'staff'
   const [isUploading, startUploadTransition] = useTransition()
   const [uploadError, setUploadError] = useState('')
   const [actionPendingId, setActionPendingId] = useState<string | null>(null)

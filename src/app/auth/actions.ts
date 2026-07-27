@@ -221,12 +221,16 @@ export async function inviteClient(clientId: string, clientEmail: string, client
 
   const { data: profile } = await supabase
     .from('user_profile')
-    .select('role, firm_id')
+    .select('role, firm_id, status')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'staff'].includes(profile.role)) {
-    throw new Error('Only firm staff can invite clients')
+  if (profile?.role !== 'attorney') {
+    throw new Error('Only attorneys can invite clients to the portal')
+  }
+
+  if (profile.status === 'deactivated') {
+    throw new Error('Account deactivated')
   }
 
   const headersList = await headers()

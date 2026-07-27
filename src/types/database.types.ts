@@ -8,8 +8,11 @@ export type Json =
 
 // ──────────────────────────────────────────────────
 // Role type — shared across the app
+// Phase 2: Extended from 3 to 5 roles
 // ──────────────────────────────────────────────────
-export type UserRole = 'firm_admin' | 'staff' | 'client'
+export type UserRole = 'super_admin' | 'firm_admin' | 'attorney' | 'staff' | 'client'
+
+export type UserStatus = 'active' | 'deactivated'
 
 export type CaseStatus = 'intake' | 'active' | 'awaiting_court' | 'closed'
 
@@ -29,6 +32,9 @@ export interface UserProfileRow {
   firm_id: string
   full_name: string
   role: UserRole
+  status: UserStatus
+  deactivated_at: string | null
+  deactivated_by: string | null
   created_at: string
 }
 
@@ -97,16 +103,56 @@ export interface AuditLogRow {
   created_at: string
 }
 
+// Phase 2 — Super Admin audit log (immutable)
+export interface SuperAdminAuditLogRow {
+  id: string
+  super_admin_id: string
+  action: string
+  target_type: string
+  target_id: string | null
+  ip_address: string | null
+  created_at: string
+}
+
+// Phase 2 — Case document access grants (Staff content access)
+export interface CaseDocumentAccessRow {
+  id: string
+  case_id: string
+  user_id: string
+  firm_id: string
+  granted_by: string
+  created_at: string
+}
+
+// Phase 2 — Firm invitations (team member invites)
+export type InviteRole = 'attorney' | 'staff'
+export type InviteStatus = 'pending' | 'accepted' | 'expired'
+
+export interface FirmInvitationRow {
+  id: string
+  firm_id: string
+  email: string
+  full_name: string
+  role: InviteRole
+  invited_by: string
+  token: string
+  expires_at: string
+  accepted_at: string | null
+  created_at: string
+}
+
 // ──────────────────────────────────────────────────
 // Insert types (what you pass to INSERT)
 // ──────────────────────────────────────────────────
-export type InsertFirm       = Omit<FirmRow, 'id' | 'created_at'>
-export type InsertUserProfile = Omit<UserProfileRow, 'created_at'>
-export type InsertClient     = Omit<ClientRow, 'id' | 'created_at'>
-export type InsertCase       = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>
-export type InsertDocument   = Omit<DocumentRow, 'id' | 'created_at'>
-export type InsertCaseEvent  = Omit<CaseEventRow, 'id' | 'created_at'>
-export type InsertNote       = Omit<NoteRow, 'id' | 'created_at'>
+export type InsertFirm                = Omit<FirmRow, 'id' | 'created_at'>
+export type InsertUserProfile         = Omit<UserProfileRow, 'created_at' | 'deactivated_at' | 'deactivated_by'>
+export type InsertClient              = Omit<ClientRow, 'id' | 'created_at'>
+export type InsertCase                = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>
+export type InsertDocument            = Omit<DocumentRow, 'id' | 'created_at'>
+export type InsertCaseEvent           = Omit<CaseEventRow, 'id' | 'created_at'>
+export type InsertNote                = Omit<NoteRow, 'id' | 'created_at'>
+export type InsertCaseDocumentAccess  = Omit<CaseDocumentAccessRow, 'id' | 'created_at'>
+export type InsertFirmInvitation      = Omit<FirmInvitationRow, 'id' | 'token' | 'created_at' | 'accepted_at'>
 
 // ──────────────────────────────────────────────────
 // Update types
@@ -114,3 +160,4 @@ export type InsertNote       = Omit<NoteRow, 'id' | 'created_at'>
 export type UpdateCase      = Partial<Pick<CaseRow, 'title' | 'matter_type' | 'status' | 'assigned_user_id'>>
 export type UpdateDocument  = Partial<Pick<DocumentRow, 'tag' | 'visible_to_client'>>
 export type UpdateCaseEvent = Partial<Pick<CaseEventRow, 'title' | 'event_date' | 'visible_to_client'>>
+

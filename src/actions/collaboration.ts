@@ -5,8 +5,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { writeAuditLog } from '@/actions/audit'
 
-// Helper to authenticate staff and return details
-async function requireStaff() {
+// Helper to authenticate a firm member and return details
+async function requireFirmMember() {
   const supabase = await createClient()
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -14,11 +14,15 @@ async function requireStaff() {
 
   const { data: profile } = await supabase
     .from('user_profile')
-    .select('id, firm_id, role')
+    .select('id, firm_id, role, status')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'staff'].includes(profile.role)) {
+  if (!profile || !['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
+    redirect('/auth/login')
+  }
+
+  if (profile.status === 'deactivated') {
     redirect('/auth/login')
   }
 
@@ -27,9 +31,10 @@ async function requireStaff() {
 
 // ─────────────────────────────────────────────────────────────
 // CREATE CASE EVENT (Court Date / Filing Deadline)
+// PRD §2.2: Firm Admin ✓, Attorney ✓, Staff ✓
 // ─────────────────────────────────────────────────────────────
 export async function createCaseEvent(formData: FormData) {
-  const { supabase, profile } = await requireStaff()
+  const { supabase, profile } = await requireFirmMember()
 
   const caseId = formData.get('case_id') as string
   const title = (formData.get('title') as string)?.trim()
@@ -71,9 +76,10 @@ export async function createCaseEvent(formData: FormData) {
 
 // ─────────────────────────────────────────────────────────────
 // CREATE CASE NOTE (Internal Collaboration)
+// PRD §2.2: Firm Admin ✓, Attorney ✓, Staff ✓
 // ─────────────────────────────────────────────────────────────
 export async function createCaseNote(formData: FormData) {
-  const { supabase, profile } = await requireStaff()
+  const { supabase, profile } = await requireFirmMember()
 
   const caseId = formData.get('case_id') as string
   const body = (formData.get('body') as string)?.trim()

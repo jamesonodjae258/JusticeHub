@@ -45,6 +45,33 @@ export default async function ClientLoginPage({
           <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '12px' }}>
             Invitation links contain the secure portal settings for your particular firm (e.g., <code>/portal/firm-name/login</code>).
           </p>
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ marginTop: '20px', borderTop: '1px dashed var(--color-border)', paddingTop: '15px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
+                <strong>Development Quick Access</strong>
+              </p>
+              <a
+                href="/portal/justice-partners/login"
+                className="auth-btn"
+                style={{
+                  display: 'block',
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                  background: 'var(--color-primary, #3b82f6)',
+                  color: 'white',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                }}
+              >
+                Go to Test Firm Portal
+              </a>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+                Uses local test slug <code>justice-partners</code>
+              </p>
+            </div>
+          )}
         </div>
 
         <p className="auth-footer-link" style={{ marginTop: '24px' }}>

@@ -5,8 +5,13 @@ import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { writeAuditLog } from '@/actions/audit'
 
-// Helper to authenticate staff and return details
-async function requireStaff() {
+// ─────────────────────────────────────────────────────────────
+// ROLE TYPES for clarity
+// ─────────────────────────────────────────────────────────────
+type FirmRole = 'firm_admin' | 'attorney' | 'staff'
+
+// Helper to authenticate a firm member and return details
+async function requireFirmMember() {
   const supabase = await createClient()
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -14,15 +19,19 @@ async function requireStaff() {
 
   const { data: profile } = await supabase
     .from('user_profile')
-    .select('id, firm_id, role')
+    .select('id, firm_id, role, status')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'staff'].includes(profile.role)) {
+  if (!profile || !['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
     redirect('/auth/login')
   }
 
-  return { supabase, user, profile }
+  if (profile.status === 'deactivated') {
+    redirect('/auth/login')
+  }
+
+  return { supabase, user, profile: profile as typeof profile & { role: FirmRole } }
 }
 
 // Helper to check user session (staff or client)
@@ -35,11 +44,12 @@ async function requireUser() {
   // Load profile to verify they exist as user_profile (staff) or client (client portal)
   const { data: profile } = await supabase
     .from('user_profile')
-    .select('id, firm_id, role')
+    .select('id, firm_id, role, status')
     .eq('id', user.id)
     .single()
 
   if (profile) {
+    if (profile.status === 'deactivated') throw new Error('Account deactivated')
     return { supabase, user, role: profile.role, firmId: profile.firm_id }
   }
 
@@ -50,7 +60,7 @@ async function requireUser() {
     .single()
 
   if (clientRecord) {
-    return { supabase, user, role: 'client', firmId: clientRecord.firm_id }
+    return { supabase, user, role: 'client' as const, firmId: clientRecord.firm_id }
   }
 
   throw new Error('Unauthorized')
@@ -58,9 +68,15 @@ async function requireUser() {
 
 // ─────────────────────────────────────────────────────────────
 // UPLOAD DOCUMENT
+// PRD §2.2: Attorney ✓, Staff ✓ (upload allowed), Firm Admin ✗
 // ─────────────────────────────────────────────────────────────
 export async function uploadDocument(formData: FormData) {
-  const { supabase, profile } = await requireStaff()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only attorney and staff can upload documents
+  if (!['attorney', 'staff'].includes(profile.role)) {
+    throw new Error('Only attorneys and staff can upload documents')
+  }
 
   const caseId = formData.get('case_id') as string
   const tag = formData.get('tag') as string || 'Other'
@@ -133,9 +149,15 @@ export async function uploadDocument(formData: FormData) {
 
 // ─────────────────────────────────────────────────────────────
 // DELETE DOCUMENT
+// PRD §2.2: Only Attorney can edit/delete documents
 // ─────────────────────────────────────────────────────────────
 export async function deleteDocument(docId: string) {
-  const { supabase, profile } = await requireStaff()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only attorneys can delete documents
+  if (profile.role !== 'attorney') {
+    throw new Error('Only attorneys can delete documents')
+  }
 
   // Fetch document details to verify ownership and get storage path
   const { data: doc, error: fetchErr } = await supabase
@@ -184,9 +206,15 @@ export async function deleteDocument(docId: string) {
 
 // ─────────────────────────────────────────────────────────────
 // TOGGLE DOCUMENT VISIBILITY
+// PRD §2.2: Only Attorney can edit documents
 // ─────────────────────────────────────────────────────────────
 export async function toggleDocumentVisibility(docId: string, visible: boolean) {
-  const { supabase, profile } = await requireStaff()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only attorneys can toggle document visibility
+  if (profile.role !== 'attorney') {
+    throw new Error('Only attorneys can change document visibility')
+  }
 
   const { data: doc, error: fetchErr } = await supabase
     .from('document')
@@ -223,12 +251,49 @@ export async function toggleDocumentVisibility(docId: string, visible: boolean) 
 
 // ─────────────────────────────────────────────────────────────
 // GET SIGNED DOWNLOAD URL
+//
+// CRITICAL ENFORCEMENT POINT for document content restriction:
+//   - firm_admin → BLOCKED (can see metadata only, never file content)
+//   - staff      → CHECK case_document_access for explicit grant
+//   - attorney   → ALLOWED (full access)
+//   - client     → ALLOWED (RLS already scopes to visible docs)
 // ─────────────────────────────────────────────────────────────
 export async function getSignedDownloadUrl(docId: string): Promise<string> {
   const { supabase, user, role, firmId } = await requireUser()
 
+  // ── Layer 3: Application-level role check ──────────────────
+  // (Layer 1 = Storage RLS; Layer 2 = Document table RLS)
+
+  if (role === 'firm_admin') {
+    throw new Error('Document content access is restricted for Firm Admin. You can view document metadata (name, tag, dates) but not the file contents.')
+  }
+
+  if (role === 'staff') {
+    // Staff must have an explicit grant from an Attorney for this case
+    const { data: doc } = await supabase
+      .from('document')
+      .select('case_id')
+      .eq('id', docId)
+      .single()
+
+    if (!doc) {
+      throw new Error('Document not found')
+    }
+
+    const { data: grant } = await supabase
+      .from('case_document_access')
+      .select('id')
+      .eq('case_id', doc.case_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!grant) {
+      throw new Error('Document content access not granted for this case. An attorney must grant you access first.')
+    }
+  }
+
   // Fetch document row using user-bound client to enforce table-level RLS policies.
-  // Clients can only query visible docs on their own cases; staff can query same-firm docs.
+  // Clients can only query visible docs on their own cases; attorneys can query same-firm docs.
   const { data: doc, error: fetchErr } = await supabase
     .from('document')
     .select('filename, storage_path')
@@ -260,4 +325,93 @@ export async function getSignedDownloadUrl(docId: string): Promise<string> {
   })
 
   return data.signedUrl
+}
+
+// ─────────────────────────────────────────────────────────────
+// GRANT DOCUMENT ACCESS TO STAFF
+// PRD §2.1: Attorney can explicitly grant a Staff member
+// content access to documents on a specific case.
+// ─────────────────────────────────────────────────────────────
+export async function grantDocumentAccess(caseId: string, staffUserId: string) {
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only attorneys can grant access
+  if (profile.role !== 'attorney') {
+    throw new Error('Only attorneys can grant document access to staff')
+  }
+
+  // Verify the staff member exists and has role='staff' in the same firm
+  const { data: staffProfile } = await supabase
+    .from('user_profile')
+    .select('id, role')
+    .eq('id', staffUserId)
+    .eq('firm_id', profile.firm_id)
+    .eq('role', 'staff')
+    .single()
+
+  if (!staffProfile) {
+    throw new Error('Staff member not found in your firm')
+  }
+
+  const { error } = await supabase
+    .from('case_document_access')
+    .insert({
+      case_id: caseId,
+      user_id: staffUserId,
+      firm_id: profile.firm_id,
+      granted_by: profile.id,
+    })
+
+  if (error) {
+    if (error.code === '23505') {
+      // Unique constraint violation — already granted
+      return
+    }
+    throw new Error('Failed to grant document access: ' + error.message)
+  }
+
+  await writeAuditLog({
+    firmId: profile.firm_id,
+    actorId: profile.id,
+    action: 'document_access.granted',
+    entityType: 'case_document_access',
+    entityId: caseId,
+    payload: { staff_user_id: staffUserId },
+  })
+
+  revalidatePath(`/cases/${caseId}`)
+}
+
+// ─────────────────────────────────────────────────────────────
+// REVOKE DOCUMENT ACCESS FROM STAFF
+// ─────────────────────────────────────────────────────────────
+export async function revokeDocumentAccess(caseId: string, staffUserId: string) {
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only attorneys can revoke access
+  if (profile.role !== 'attorney') {
+    throw new Error('Only attorneys can revoke document access')
+  }
+
+  const { error } = await supabase
+    .from('case_document_access')
+    .delete()
+    .eq('case_id', caseId)
+    .eq('user_id', staffUserId)
+    .eq('firm_id', profile.firm_id)
+
+  if (error) {
+    throw new Error('Failed to revoke document access: ' + error.message)
+  }
+
+  await writeAuditLog({
+    firmId: profile.firm_id,
+    actorId: profile.id,
+    action: 'document_access.revoked',
+    entityType: 'case_document_access',
+    entityId: caseId,
+    payload: { staff_user_id: staffUserId },
+  })
+
+  revalidatePath(`/cases/${caseId}`)
 }

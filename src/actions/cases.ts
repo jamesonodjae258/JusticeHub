@@ -11,7 +11,7 @@ import type { CaseStatus } from '@/types/database.types'
 // ─────────────────────────────────────────────────────────────
 
 /** Returns the current user's profile + firm_id or throws. */
-async function requireStaffProfile() {
+async function requireFirmMember() {
   const supabase = await createClient()
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -19,11 +19,15 @@ async function requireStaffProfile() {
 
   const { data: profile } = await supabase
     .from('user_profile')
-    .select('id, firm_id, role, full_name')
+    .select('id, firm_id, role, full_name, status')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['firm_admin', 'staff'].includes(profile.role)) {
+  if (!profile || !['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
+    redirect('/auth/login')
+  }
+
+  if (profile.status === 'deactivated') {
     redirect('/auth/login')
   }
 
@@ -32,9 +36,15 @@ async function requireStaffProfile() {
 
 // ─────────────────────────────────────────────────────────────
 // CREATE CLIENT (inline — called from new-case form)
+// PRD §2.2: Firm Admin ✓, Attorney ✓, Staff ✗
 // ─────────────────────────────────────────────────────────────
 export async function createClient_action(formData: FormData): Promise<{ id: string } | { error: string }> {
-  const { supabase, profile } = await requireStaffProfile()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only firm_admin and attorney can create clients
+  if (!['firm_admin', 'attorney'].includes(profile.role)) {
+    return { error: 'Only attorneys and firm admins can create clients.' }
+  }
 
   const name  = (formData.get('name')  as string)?.trim()
   const email = (formData.get('email') as string)?.trim().toLowerCase()
@@ -74,9 +84,15 @@ export async function createClient_action(formData: FormData): Promise<{ id: str
 
 // ─────────────────────────────────────────────────────────────
 // CREATE CASE
+// PRD §2.2: Firm Admin ✓, Attorney ✓, Staff ✗
 // ─────────────────────────────────────────────────────────────
 export async function createCase(formData: FormData) {
-  const { supabase, profile } = await requireStaffProfile()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only firm_admin and attorney can create cases
+  if (!['firm_admin', 'attorney'].includes(profile.role)) {
+    redirect('/cases?error=insufficient_permissions')
+  }
 
   const title          = (formData.get('title')           as string)?.trim()
   const clientId       = formData.get('client_id')        as string
@@ -120,6 +136,7 @@ export async function createCase(formData: FormData) {
 
 // ─────────────────────────────────────────────────────────────
 // UPDATE CASE (status + assignment)
+// PRD §2.2: Firm Admin ✓ (all cases), Attorney ✓ (assigned only — enforced by RLS)
 // DB triggers handle audit logging for these changes.
 // ─────────────────────────────────────────────────────────────
 export async function updateCase(
@@ -131,7 +148,12 @@ export async function updateCase(
     matter_type?:     string
   }
 ) {
-  const { supabase } = await requireStaffProfile()
+  const { supabase, profile } = await requireFirmMember()
+
+  // Only firm_admin and attorney can update cases
+  if (!['firm_admin', 'attorney'].includes(profile.role)) {
+    throw new Error('Only attorneys and firm admins can update cases')
+  }
 
   const { error } = await supabase
     .from('case')
