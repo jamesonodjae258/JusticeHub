@@ -2,17 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * Refreshes the Supabase auth session on every request.
- * Must be called from src/proxy.ts.
- *
- * Route map (Phase 2 — 5 roles):
- *   /cases/*      → firm_admin + attorney + staff
- *   /dashboard/*  → firm_admin + attorney + staff
- *   /clients/*    → firm_admin + attorney + staff
- *   /documents/*  → firm_admin + attorney + staff
- *   /superadmin/* → super_admin only
- *   /portal/*     → clients only
- *   /auth/*       → public (redirect to correct home if already authed)
+ * Middleware — Phase 2 PRD v3.0
+ * Enforces strict 404 route group isolation for non-owner roles:
+ *   /dashboard/overview/** → super_admin only
+ *   /dashboard/admin/**    → firm_admin only
+ *   /dashboard/lawyer/**   → attorney + staff only
+ *   /portal/**             → client only
+ *   /onboarding            → firm signup (super_admin creation)
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -38,9 +34,6 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: do not add any logic between createServerClient and
-  // getUser(). A bug here could make it very hard to debug issues with
-  // users being randomly logged out.
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -48,159 +41,115 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isAuthRoute           = pathname.startsWith('/auth')
-  const isDashboardRoute      = pathname.startsWith('/dashboard')
-  const isCasesRoute          = pathname.startsWith('/cases')
-  const isClientsRoute        = pathname.startsWith('/clients')
-  const isDocumentsRoute      = pathname.startsWith('/documents')
-  const isTeamRoute           = pathname.startsWith('/team')
-  const isSettingsRoute       = pathname.startsWith('/settings')
-  const isSuperAdminRoute     = pathname.startsWith('/superadmin')
+  const isOnboardingRoute     = pathname.startsWith('/onboarding')
+  const isSuperOverviewRoute  = pathname.startsWith('/dashboard/overview') || pathname.startsWith('/superadmin')
+  const isAdminDashboardRoute = pathname.startsWith('/dashboard/admin')
+  const isLawyerDashboardRoute= pathname.startsWith('/dashboard/lawyer')
+  const isGenericDashboard    = pathname === '/dashboard' || pathname === '/dashboard/'
   const isPortalRoute         = pathname.startsWith('/portal')
-  const isPortalLoginRoute    = isPortalRoute && pathname.endsWith('/login')
-  const isProtectedStaffRoute = isDashboardRoute || isCasesRoute || isClientsRoute || isDocumentsRoute || isTeamRoute || isSettingsRoute
+  const isPortalLoginRoute    = isPortalRoute && (pathname.endsWith('/login') || pathname.includes('/login'))
 
-  // ── SUPERADMIN ROUTE ISOLATION — MUST RETURN 404 TO NON-SUPERADMINS ──
-  if (isSuperAdminRoute) {
-    if (!user) {
-      return NextResponse.rewrite(new URL('/_not-found', request.url))
-    }
+  const isProtectedDashboard  = isSuperOverviewRoute || isAdminDashboardRoute || isLawyerDashboardRoute || isGenericDashboard || pathname.startsWith('/cases') || pathname.startsWith('/clients') || pathname.startsWith('/documents') || pathname.startsWith('/team') || pathname.startsWith('/settings')
 
-    const { data: saProfile } = await supabase
-      .from('user_profile')
-      .select('role, status')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (!saProfile || saProfile.role !== 'super_admin' || saProfile.status === 'deactivated') {
-      // 404 rewrite — do not reveal that /superadmin route exists
-      return NextResponse.rewrite(new URL('/_not-found', request.url))
-    }
-  }
-
-  // ── Unauthenticated → send to login ──────────────────────────
-  if (!user && (isProtectedStaffRoute || (isPortalRoute && !isPortalLoginRoute))) {
+  // 1. Unauthenticated users trying to access protected routes -> redirect to login
+  if (!user && (isProtectedDashboard || (isPortalRoute && !isPortalLoginRoute))) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = isPortalRoute ? '/auth/client-login' : '/auth/login'
     loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // ── Authenticated on an auth page → redirect to correct home ──
-  // Exception: /auth/confirm must always run (it exchanges the token and
-  // sets up the firm/profile). /auth/signout must also be excluded.
-  const isConfirmRoute = pathname.startsWith('/auth/confirm')
-  const isSignoutRoute = pathname.startsWith('/auth/signout')
+  // 2. Fetch role and status from user_profile or JWT
+  let userRole: string | null = null
+  let isDeactivated = false
 
-  if (user && isAuthRoute && !isConfirmRoute && !isSignoutRoute) {
-    // Fetch profile and client records in parallel
-    const [clientRes, profileRes] = await Promise.all([
-      supabase.from('client').select('id').eq('auth_user_id', user.id).maybeSingle(),
-      supabase.from('user_profile').select('role, status').eq('id', user.id).maybeSingle()
-    ])
-
-    const clientRow = clientRes.data
-    const profile = profileRes.data
-
-    if (!clientRow && !profile) {
-      // Stale session or failed signup confirmation: sign out to clear session and break the loop
-      await supabase.auth.signOut()
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/auth/login'
-      loginUrl.searchParams.set('error', 'confirmation_failed')
-      return NextResponse.redirect(loginUrl)
-    }
-
-    // Block deactivated users
-    if (profile?.status === 'deactivated') {
-      await supabase.auth.signOut()
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/auth/login'
-      loginUrl.searchParams.set('error', 'account_deactivated')
-      return NextResponse.redirect(loginUrl)
-    }
-
-    const homeUrl = request.nextUrl.clone()
-    if (profile?.role === 'super_admin') {
-      homeUrl.pathname = '/superadmin'
-    } else if (clientRow) {
-      homeUrl.pathname = '/portal'
-    } else {
-      homeUrl.pathname = '/dashboard'
-    }
-    homeUrl.search = ''
-    return NextResponse.redirect(homeUrl)
-  }
-
-  // ── Super admin trying to access firm routes → superadmin home ──
-  if (user && (isProtectedStaffRoute || isPortalRoute)) {
+  if (user) {
     const { data: profile } = await supabase
       .from('user_profile')
       .select('role, status')
       .eq('id', user.id)
       .maybeSingle()
 
-    // Block deactivated users
-    if (profile?.status === 'deactivated') {
-      await supabase.auth.signOut()
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/auth/login'
-      loginUrl.searchParams.set('error', 'account_deactivated')
-      return NextResponse.redirect(loginUrl)
-    }
-
-    if (profile?.role === 'super_admin') {
-      const superUrl = request.nextUrl.clone()
-      superUrl.pathname = '/superadmin'
-      superUrl.search = ''
-      return NextResponse.redirect(superUrl)
-    }
+    userRole = profile?.role ?? null
+    isDeactivated = profile?.status === 'deactivated'
   }
 
-  // ── Client user trying to access staff routes → portal ───────
-  if (user && isProtectedStaffRoute) {
-    const { data: profile } = await supabase
-      .from('user_profile')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (profile?.role === 'client') {
-      const portalUrl = request.nextUrl.clone()
-      portalUrl.pathname = '/portal'
-      portalUrl.search = ''
-      return NextResponse.redirect(portalUrl)
-    }
+  // 3. Block deactivated users immediately
+  if (user && isDeactivated) {
+    await supabase.auth.signOut()
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/auth/login'
+    loginUrl.searchParams.set('error', 'account_deactivated')
+    return NextResponse.redirect(loginUrl)
   }
 
-  // ── Staff/attorney/admin user trying to access portal route → dashboard ──
-  if (user && isPortalRoute) {
-    const { data: profile } = await supabase
-      .from('user_profile')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
+  // 4. Authenticated user on auth/login or onboarding pages -> redirect to correct dashboard
+  const isConfirmRoute = pathname.startsWith('/auth/confirm')
+  const isSignoutRoute = pathname.startsWith('/auth/signout')
 
-    if (profile && ['firm_admin', 'attorney', 'staff'].includes(profile.role)) {
-      const dashboardUrl = request.nextUrl.clone()
-      dashboardUrl.pathname = '/dashboard'
-      dashboardUrl.search = ''
-      return NextResponse.redirect(dashboardUrl)
+  if (user && (isAuthRoute || isOnboardingRoute) && !isConfirmRoute && !isSignoutRoute) {
+    const homeUrl = request.nextUrl.clone()
+    homeUrl.search = ''
+
+    if (userRole === 'super_admin') {
+      homeUrl.pathname = '/dashboard/overview'
+    } else if (userRole === 'firm_admin') {
+      homeUrl.pathname = '/dashboard/admin'
+    } else if (userRole === 'attorney' || userRole === 'staff') {
+      homeUrl.pathname = '/dashboard/lawyer'
+    } else if (userRole === 'client') {
+      homeUrl.pathname = '/portal'
+    } else {
+      homeUrl.pathname = '/dashboard'
     }
+
+    return NextResponse.redirect(homeUrl)
   }
 
-  // ── Non-super-admin trying to access /superadmin → their home ──
-  if (user && isSuperAdminRoute) {
-    const { data: profile } = await supabase
-      .from('user_profile')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
+  // 5. Generic `/dashboard` redirect to role-specific dashboard
+  if (user && isGenericDashboard && userRole) {
+    const homeUrl = request.nextUrl.clone()
+    homeUrl.search = ''
 
-    if (profile?.role !== 'super_admin') {
-      const homeUrl = request.nextUrl.clone()
-      homeUrl.pathname = profile ? '/dashboard' : '/portal'
-      homeUrl.search = ''
-      return NextResponse.redirect(homeUrl)
+    if (userRole === 'super_admin') {
+      homeUrl.pathname = '/dashboard/overview'
+    } else if (userRole === 'firm_admin') {
+      homeUrl.pathname = '/dashboard/admin'
+    } else if (userRole === 'attorney' || userRole === 'staff') {
+      homeUrl.pathname = '/dashboard/lawyer'
+    } else if (userRole === 'client') {
+      homeUrl.pathname = '/portal'
+    }
+
+    return NextResponse.redirect(homeUrl)
+  }
+
+  // 6. STRICT 404 ROUTE GROUP ISOLATION RULES (PRD v3.0)
+  // A user hitting a route group they do not own MUST receive a 404 rewrite
+  if (user && userRole) {
+    // Rule A: /dashboard/overview/** is for super_admin ONLY
+    if (isSuperOverviewRoute && userRole !== 'super_admin') {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+
+    // Rule B: /dashboard/admin/** is for firm_admin ONLY
+    if (isAdminDashboardRoute && userRole !== 'firm_admin') {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+
+    // Rule C: /dashboard/lawyer/** is for attorney + staff ONLY
+    if (isLawyerDashboardRoute && !['attorney', 'staff'].includes(userRole)) {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+
+    // Rule D: /portal/** is for client ONLY
+    if (isPortalRoute && !isPortalLoginRoute && userRole !== 'client') {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
+    }
+
+    // Rule E: client role cannot reach ANY /dashboard route
+    if (userRole === 'client' && isProtectedDashboard) {
+      return NextResponse.rewrite(new URL('/_not-found', request.url))
     }
   }
 

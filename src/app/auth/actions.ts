@@ -37,7 +37,7 @@ export async function signUp(formData: FormData) {
         data: {
           full_name: fullName,
           firm_name: firmName,
-          role: 'firm_admin',
+          role: 'super_admin',
         },
         emailRedirectTo: `${siteUrl}/auth/confirm`,
       },
@@ -331,14 +331,14 @@ export async function completeOnboarding(formData: FormData) {
     redirect('/auth/onboarding?error=firm_creation_failed')
   }
 
-  // Create the user_profile as firm_admin
+  // Create the user_profile as super_admin
   const { error: profileError } = await adminSupabase
     .from('user_profile')
     .upsert({
       id:        user.id,
       firm_id:   firm.id,
       full_name: fullName,
-      role:      'firm_admin',
+      role:      'super_admin',
     })
 
   if (profileError) {
@@ -346,5 +346,5 @@ export async function completeOnboarding(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect('/dashboard/overview')
 }
