@@ -122,9 +122,12 @@ CREATE POLICY "documents_storage_delete"
 
 CREATE TABLE IF NOT EXISTS login_audit (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  ip_address  text NOT NULL,
+  user_id     uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+  firm_id     uuid NULL REFERENCES firm(id) ON DELETE SET NULL,
+  ip_address  text NOT NULL DEFAULT '127.0.0.1',
+  device      text NOT NULL DEFAULT 'Unknown Device',
   user_agent  text NULL,
+  success     boolean NOT NULL DEFAULT true,
   logged_at   timestamptz NOT NULL DEFAULT now()
 );
 

@@ -25,7 +25,6 @@ CREATE INDEX IF NOT EXISTS activity_log_firm_idx ON activity_log(firm_id);
 CREATE INDEX IF NOT EXISTS activity_log_created_idx ON activity_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS activity_log_entity_idx ON activity_log(entity_type, entity_id);
 
--- 2. LOGIN AUDIT TABLE
 CREATE TABLE IF NOT EXISTS login_audit (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -36,6 +35,10 @@ CREATE TABLE IF NOT EXISTS login_audit (
   success     boolean NOT NULL DEFAULT true,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS firm_id uuid NULL REFERENCES firm(id) ON DELETE SET NULL;
+ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS device text NOT NULL DEFAULT 'Unknown Device';
+ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS success boolean NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS login_audit_firm_idx ON login_audit(firm_id);
 CREATE INDEX IF NOT EXISTS login_audit_user_idx ON login_audit(user_id);
