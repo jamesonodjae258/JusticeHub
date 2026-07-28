@@ -76,6 +76,13 @@ REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, a
 -- firm_admin can see document metadata, but CANNOT read/download document content
 -- ─────────────────────────────────────────────────────────────
 
+CREATE TABLE IF NOT EXISTS case_document_access (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  case_id     uuid NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
 DROP POLICY IF EXISTS "documents_storage_select" ON storage.objects;
 DROP POLICY IF EXISTS "documents_storage_insert" ON storage.objects;
 DROP POLICY IF EXISTS "documents_storage_delete" ON storage.objects;
