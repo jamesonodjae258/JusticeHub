@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS login_audit (
 ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS firm_id uuid NULL REFERENCES firm(id) ON DELETE SET NULL;
 ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS device text NOT NULL DEFAULT 'Unknown Device';
 ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS success boolean NOT NULL DEFAULT true;
+ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS login_audit_firm_idx ON login_audit(firm_id);
 CREATE INDEX IF NOT EXISTS login_audit_user_idx ON login_audit(user_id);

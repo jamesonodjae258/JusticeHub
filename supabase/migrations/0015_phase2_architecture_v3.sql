@@ -128,8 +128,10 @@ CREATE TABLE IF NOT EXISTS login_audit (
   device      text NOT NULL DEFAULT 'Unknown Device',
   user_agent  text NULL,
   success     boolean NOT NULL DEFAULT true,
-  logged_at   timestamptz NOT NULL DEFAULT now()
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE login_audit ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 
 ALTER TABLE login_audit ENABLE ROW LEVEL SECURITY;
 
