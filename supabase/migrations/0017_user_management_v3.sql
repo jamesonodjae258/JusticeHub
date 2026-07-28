@@ -4,7 +4,22 @@
 -- allow super_admin to invite firm_admin, role-scoped RLS.
 -- ============================================================
 
--- 1. Relax role check on firm_invitations to allow firm_admin invites
+-- 1. CREATE TABLE IF NOT EXISTS
+CREATE TABLE IF NOT EXISTS firm_invitations (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id     uuid NOT NULL REFERENCES firm(id) ON DELETE CASCADE,
+  email       text NOT NULL,
+  role        text NOT NULL CHECK (role IN ('firm_admin', 'attorney', 'staff')),
+  invited_by  uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  token       uuid NOT NULL DEFAULT gen_random_uuid(),
+  expires_at  timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  accepted_at timestamptz NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE firm_invitations ENABLE ROW LEVEL SECURITY;
+
+-- 2. Relax role check on firm_invitations to allow firm_admin invites
 ALTER TABLE firm_invitations DROP CONSTRAINT IF EXISTS firm_invitations_role_check;
 
 ALTER TABLE firm_invitations ADD CONSTRAINT firm_invitations_role_check
