@@ -14,10 +14,32 @@ ALTER TABLE user_profile
   ADD COLUMN IF NOT EXISTS deactivated_by uuid NULL REFERENCES auth.users(id);
 
 -- ─────────────────────────────────────────────────────────────
--- 2. JWT CUSTOM CLAIMS HOOK
--- Injects user_role, user_firm_id, and user_status into access token claims
+-- 2. HELPER FUNCTIONS & JWT CUSTOM CLAIMS HOOK
 -- ─────────────────────────────────────────────────────────────
 
+CREATE OR REPLACE FUNCTION my_role() RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'user_role'),
+    (SELECT role FROM public.user_profile WHERE id = auth.uid())
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION my_firm_id() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'user_firm_id')::uuid,
+    (SELECT firm_id FROM public.user_profile WHERE id = auth.uid())
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_super_admin() RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT my_role() = 'super_admin';
+$$;
+
+CREATE OR REPLACE FUNCTION is_firm_admin() RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT my_role() = 'firm_admin';
+$$;
+
+-- Injects user_role, user_firm_id, and user_status into access token claims
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
 DECLARE
@@ -48,21 +70,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
 REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
-
--- Helper functions
-CREATE OR REPLACE FUNCTION my_role() RETURNS text LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(
-    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'user_role'),
-    (SELECT role FROM public.user_profile WHERE id = auth.uid())
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION my_firm_id() RETURNS uuid LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(
-    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'user_firm_id')::uuid,
-    (SELECT firm_id FROM public.user_profile WHERE id = auth.uid())
-  );
-$$;
 
 -- ─────────────────────────────────────────────────────────────
 -- 3. STORAGE POLICIES — DOCUMENT BINARY ACCESS RESTRICTIONS
