@@ -83,11 +83,29 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // 4. Authenticated user on auth/login or onboarding pages -> redirect to correct dashboard
+  // 4. Authenticated user without user_profile trying to access protected route -> send to onboarding
+  if (user && !userRole && isProtectedDashboard) {
+    const onboardingUrl = request.nextUrl.clone()
+    onboardingUrl.pathname = '/auth/onboarding'
+    return NextResponse.redirect(onboardingUrl)
+  }
+
+  // 5. Authenticated user on auth/login or onboarding pages -> redirect to correct dashboard
   const isConfirmRoute = pathname.startsWith('/auth/confirm')
   const isSignoutRoute = pathname.startsWith('/auth/signout')
+  const hasErrorParam  = request.nextUrl.searchParams.has('error')
 
-  if (user && (isAuthRoute || isOnboardingRoute) && !isConfirmRoute && !isSignoutRoute) {
+  if (user && (isAuthRoute || isOnboardingRoute) && !isConfirmRoute && !isSignoutRoute && !hasErrorParam) {
+    // If the user does not have a user_profile yet:
+    if (!userRole) {
+      if (isOnboardingRoute) {
+        return supabaseResponse
+      }
+      const onboardingUrl = request.nextUrl.clone()
+      onboardingUrl.pathname = '/auth/onboarding'
+      return NextResponse.redirect(onboardingUrl)
+    }
+
     const homeUrl = request.nextUrl.clone()
     homeUrl.search = ''
 
