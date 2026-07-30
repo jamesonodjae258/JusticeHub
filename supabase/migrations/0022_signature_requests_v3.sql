@@ -31,6 +31,7 @@ CREATE INDEX IF NOT EXISTS signature_requests_status_idx ON signature_requests(s
 ALTER TABLE signature_requests ENABLE ROW LEVEL SECURITY;
 
 -- Insert: ONLY attorneys can create signature requests
+DROP POLICY IF EXISTS "signature_requests: attorney insert" ON signature_requests;
 CREATE POLICY "signature_requests: attorney insert"
   ON signature_requests FOR INSERT
   WITH CHECK (
@@ -39,6 +40,7 @@ CREATE POLICY "signature_requests: attorney insert"
   );
 
 -- Select: Firm staff and recipient client can view signature requests
+DROP POLICY IF EXISTS "signature_requests: select" ON signature_requests;
 CREATE POLICY "signature_requests: select"
   ON signature_requests FOR SELECT
   USING (
@@ -47,6 +49,7 @@ CREATE POLICY "signature_requests: select"
   );
 
 -- Update: Firm staff can update signature requests
+DROP POLICY IF EXISTS "signature_requests: staff update" ON signature_requests;
 CREATE POLICY "signature_requests: staff update"
   ON signature_requests FOR UPDATE
   USING (

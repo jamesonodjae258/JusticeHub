@@ -101,7 +101,7 @@ export default async function PortalPage() {
       >
         <div style={{ maxWidth: '960px', width: '100%', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <JusticeHubLogo variant="light" size="1.25rem" />
+            <JusticeHubLogo variant="light" />
             <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginLeft: '0.5rem', borderLeft: '1px solid var(--color-border)', paddingLeft: '0.5rem' }}>
               Client Portal
             </span>

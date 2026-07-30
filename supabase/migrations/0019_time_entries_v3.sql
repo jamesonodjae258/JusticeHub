@@ -4,6 +4,24 @@
 -- firm_admin exclusion, and full immutability lock for billed entries.
 -- ============================================================
 
+-- 0. Create time_entries if it doesn't already exist (from 0014)
+CREATE TABLE IF NOT EXISTS time_entries (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id          uuid NOT NULL REFERENCES "case"(id) ON DELETE CASCADE,
+  user_id          uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  firm_id          uuid NOT NULL REFERENCES firm(id) ON DELETE CASCADE,
+  entry_date       date NOT NULL DEFAULT CURRENT_DATE,
+  duration_minutes integer NOT NULL CHECK (duration_minutes > 0),
+  hourly_rate      numeric(10,2) NOT NULL DEFAULT 0.00,
+  is_billable      boolean NOT NULL DEFAULT true,
+  description      text NOT NULL,
+  invoice_id       uuid NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
+
 -- 1. Ensure columns exist with standard aliases
 ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS date date NOT NULL DEFAULT CURRENT_DATE;
 ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS duration_minutes integer NOT NULL DEFAULT 0;

@@ -16,7 +16,7 @@ export default async function SignupPage({
       <div className="auth-card">
         <div className="auth-header">
           <div style={{ marginBottom: '0.5rem' }}>
-            <JusticeHubLogo showSymbolOnly size="2.5rem" />
+            <JusticeHubLogo showSymbolOnly />
           </div>
           <p className="auth-subtitle">Create your firm account</p>
         </div>

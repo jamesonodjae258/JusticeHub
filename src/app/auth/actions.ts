@@ -14,6 +14,7 @@ import { generateUniqueSlug } from '@/lib/slug'
 // ─────────────────────────────────────────────────────────────
 export async function signUp(formData: FormData) {
   const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
 
   const email    = formData.get('email') as string
   const password = formData.get('password') as string
@@ -24,13 +25,9 @@ export async function signUp(formData: FormData) {
     redirect('/auth/signup?error=missing_fields')
   }
 
-  const headersList = await headers()
-  const host = headersList.get('host')
-  const protocol = host?.includes('localhost') ? 'http' : 'https'
-  const siteUrl = `${protocol}://${host}`
-
   try {
-    const { error } = await supabase.auth.signUp({
+    // 1. Create auth user (email confirmation is disabled)
+    const { data: authData, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -39,7 +36,6 @@ export async function signUp(formData: FormData) {
           firm_name: firmName,
           role: 'super_admin',
         },
-        emailRedirectTo: `${siteUrl}/auth/confirm`,
       },
     })
 
@@ -49,6 +45,52 @@ export async function signUp(formData: FormData) {
         : error.message
       redirect(`/auth/signup?error=${encodeURIComponent(msg)}`)
     }
+
+    if (!authData.user) {
+      redirect('/auth/signup?error=account_creation_failed')
+    }
+
+    // 2. Sign in immediately
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) {
+      redirect(`/auth/signup?error=${encodeURIComponent(signInError.message)}`)
+    }
+
+    // 3. Create firm
+    const slug = await generateUniqueSlug(firmName)
+    const { data: firm, error: firmError } = await adminSupabase
+      .from('firm')
+      .insert({ name: firmName, slug, status: 'active' })
+      .select('id')
+      .single()
+
+    if (firmError || !firm) {
+      redirect(`/auth/signup?error=${encodeURIComponent('Failed to create firm: ' + (firmError?.message || 'Unknown error'))}`)
+    }
+
+    // 4. Create user_profile as super_admin
+    const { error: profileError } = await adminSupabase
+      .from('user_profile')
+      .upsert({
+        id:        authData.user.id,
+        firm_id:   firm.id,
+        full_name: fullName,
+        role:      'super_admin',
+        status:    'active',
+      })
+
+    if (profileError) {
+      redirect(`/auth/signup?error=${encodeURIComponent('Failed to create profile: ' + profileError.message)}`)
+    }
+
+    // 5. Create default firm_settings
+    await adminSupabase.from('firm_settings').upsert({
+      firm_id:          firm.id,
+      contact_email:    email,
+      invoice_currency: 'NGN',
+      payment_terms:    'Payment due within 14 days',
+    })
+
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     const msg = err?.message?.toLowerCase().includes('fetch failed')
@@ -57,7 +99,8 @@ export async function signUp(formData: FormData) {
     redirect(`/auth/signup?error=${encodeURIComponent(msg)}`)
   }
 
-  redirect('/auth/signup?success=check_email')
+  revalidatePath('/', 'layout')
+  redirect('/dashboard/overview')
 }
 
 async function recordLoginAudit(userId: string | null, firmId: string | null, success: boolean) {

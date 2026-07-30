@@ -143,7 +143,7 @@ export function OnboardingWizard({ initialFirmId }: OnboardingWizardProps) {
       <div className="auth-card" style={{ maxWidth: currentStep === '1' ? '460px' : '620px' }}>
         <div className="auth-header">
           <div style={{ marginBottom: '0.5rem' }}>
-            <JusticeHubLogo showSymbolOnly size="2.5rem" />
+            <JusticeHubLogo showSymbolOnly />
           </div>
           <h1 className="auth-logo" style={{ fontSize: '20px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
             JusticeHub Onboarding

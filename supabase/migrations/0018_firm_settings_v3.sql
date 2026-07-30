@@ -4,6 +4,11 @@
 -- columns, default values, and RLS policies.
 -- ============================================================
 
+-- Helper: returns true when user is firm_admin OR super_admin
+CREATE OR REPLACE FUNCTION is_admin_or_super() RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT my_role() IN ('firm_admin', 'super_admin');
+$$;
+
 CREATE TABLE IF NOT EXISTS firm_settings (
   firm_id                  uuid PRIMARY KEY REFERENCES firm(id) ON DELETE CASCADE,
   address                  text NULL,

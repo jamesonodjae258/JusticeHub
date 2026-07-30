@@ -6,22 +6,15 @@
  *   /logo-symbol.png  — JH symbol only (collapsed sidebar / favicon)
  *
  * The component renders both images. CSS classes control which is visible:
- *   .logo-full     — hidden when sidebar is collapsed (via .logo-wordmark rule)
- *   .logo-symbol   — shown only when sidebar is collapsed
+ *   .logo-wordmark     — hidden when sidebar is collapsed
+ *   .logo-symbol-only  — shown only when sidebar is collapsed
  */
 export function JusticeHubLogo({
-  size = '1.25rem',
   showSymbolOnly = false,
 }: {
   variant?: 'dark' | 'light'
-  size?: string
   showSymbolOnly?: boolean
 }) {
-  /* Compute pixel height from the rem-based size prop */
-  const sizeNum = parseFloat(size)
-  const fullHeight  = `${sizeNum * 2.057}rem`
-  const symbolHeight = `${sizeNum * 2.286}rem`
-
   if (showSymbolOnly) {
     return (
       <img
@@ -29,7 +22,7 @@ export function JusticeHubLogo({
         alt="JusticeHub"
         draggable={false}
         style={{
-          height: symbolHeight,
+          height: '48px',
           width: 'auto',
           objectFit: 'contain',
           userSelect: 'none',
@@ -55,7 +48,7 @@ export function JusticeHubLogo({
         className="logo-wordmark"
         draggable={false}
         style={{
-          height: fullHeight,
+          height: '48px',
           width: 'auto',
           objectFit: 'contain',
           display: 'block',
@@ -69,7 +62,7 @@ export function JusticeHubLogo({
         className="logo-symbol-only"
         draggable={false}
         style={{
-          height: symbolHeight,
+          height: '48px',
           width: 'auto',
           objectFit: 'contain',
           display: 'none',
@@ -78,3 +71,4 @@ export function JusticeHubLogo({
     </span>
   )
 }
+

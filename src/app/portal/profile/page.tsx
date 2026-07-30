@@ -39,7 +39,7 @@ export default async function ClientPortalProfilePage() {
       {/* Client Portal Header */}
       <header className="portal-header">
         <div className="portal-header-brand">
-          <JusticeHubLogo size="1.6rem" />
+          <JusticeHubLogo />
           <span className="portal-header-badge">{firmName}</span>
         </div>
         <div className="portal-header-nav" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
